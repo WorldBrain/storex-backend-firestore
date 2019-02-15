@@ -3,6 +3,9 @@ import { StorageBackend } from '@worldbrain/storex/lib/types/backend'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 
 export class FirestoreStorageBackend extends StorageBackend {
+    features = {
+        executeBatch: true,
+    }
     firestore : firebase.firestore.Firestore
     rootRef : firebase.firestore.DocumentReference
 
@@ -74,6 +77,34 @@ export class FirestoreStorageBackend extends StorageBackend {
     }
     
     async deleteObjects(collection : string, query, options : backend.DeleteManyOptions) : Promise<backend.DeleteManyResult> {
+    }
+
+    async executeBatch(operations : {operation : 'createObject', collection? : string, args : any, placeholder? : string, replace? : {path : string, placeholder : string}[]}[]) {
+        const batch = this.firestore.batch()
+        const info = {}
+        const pks = {}
+        for (const operation of operations) {
+            if (operation.operation === 'createObject') {
+                const toInsert = operation.args
+                for (const {path, placeholder} of operation.replace || []) {
+                    toInsert[path] = pks[placeholder]
+                }
+                
+                const firestoreCollection = this.getFirestoreCollection(operation.collection)
+                const docRef = firestoreCollection.doc()
+                batch.set(docRef, toInsert)
+                const pk = docRef.id
+                pks[operation.placeholder] = pk
+
+                const collectionDefiniton = this.registry.collections[operation.collection]
+                const pkIndex = collectionDefiniton.pkIndex
+                info[operation.placeholder] = {object: {[pkIndex as string]: pk, ...toInsert}}
+            } else {
+                throw new Error(`Unsupported operation in batch: ${operation.operation}`)
+            }
+        }
+        await batch.commit()
+        return { info }
     }
 
     getFirestoreCollection(collection : string) {
