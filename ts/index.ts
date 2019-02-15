@@ -1,4 +1,5 @@
 import * as firebase from 'firebase'
+import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, setIn } from '@worldbrain/storex/lib/utils'
 import { StorageBackend } from '@worldbrain/storex/lib/types/backend'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 
@@ -17,6 +18,20 @@ export class FirestoreStorageBackend extends StorageBackend {
     }
 
     async createObject(collection : string, object, options : backend.CreateSingleOptions) : Promise<backend.CreateSingleResult> {
+        const dissection = dissectCreateObjectOperation({operation: 'createObject', collection, args: object}, this.registry)
+        const batchToExecute = convertCreateObjectDissectionToBatch(dissection)
+        const batchResult = await this.executeBatch(batchToExecute)
+
+        for (const step of dissection.objects) {
+            const collectionDefiniton = this.registry.collections[collection]
+            const pkIndex = collectionDefiniton.pkIndex
+            setIn(object, [...step.path, pkIndex], batchResult.info[step.placeholder].object[pkIndex as string])
+        }
+
+        return { object }
+    }
+
+    async _createSingleObject(collection : string, object) {
         const collectionDefiniton = this.registry.collections[collection]
         const pkIndex = collectionDefiniton.pkIndex
         const docRef = await this.getFirestoreCollection(collection).add(object)

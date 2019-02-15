@@ -38,7 +38,7 @@ describe('FirestoreStorageBackend integration tests', () => {
             email: {
                 version: new Date(2019, 1, 1),
                 fields: {
-                    displayName: {type: 'string'}
+                    address: {type: 'string'}
                 },
                 relationships: [
                     {childOf: 'user'}
@@ -173,7 +173,30 @@ describe('FirestoreStorageBackend integration tests', () => {
         expect(info['joeEmail']['object']['user']).toEqual(info['joe']['object']['id'])
     })
 
-    it('should be able to do complex creates')
+    it('should be able to do complex creates', async () => {
+        const { storageManager } = await setupSimpleTest()
+        const { object } = await storageManager.collection('user').createObject({
+            displayName: 'Jane',
+            emails: [{address: 'jane@doe.com'}]
+        })
+        expect(object).toEqual({
+            id: expect.anything(),
+            displayName: 'Jane',
+            emails: [{
+                id: expect.anything(),
+                address: 'jane@doe.com',
+            }]
+        })
+        expect(await storageManager.collection('user').findOneObject({id: object.id})).toEqual({
+            id: object.id,
+            displayName: 'Jane'
+        })
+        expect(await storageManager.collection('email').findOneObject({id: object.emails[0].id})).toEqual({
+            id: object.emails[0].id,
+            user: object.id,
+            address: 'jane@doe.com'
+        })
+    })
 
     // testStorageBackend(async () => {
     //     return new FirestoreStorageBackend({firestore: firebase.firestore(), rootRef: unittestFirestoreRef})
