@@ -323,7 +323,27 @@ describe('FirestoreStorageBackend', () => {
         })
     })
 
-    it('should be able to delete objects')
+    it('should be able to delete single objects by pk', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        const { object: object1 } = await storageManager.collection('object').createObject({field: 1})
+        const { object: object2 } = await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').deleteOneObject(object1)
+        expect(await storageManager.collection('object').findObjects({})).toEqual([
+            expect.objectContaining({id: object2.id})
+        ])
+    })
+
+    it('should be able to delete multiple objects by pk', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        const { object: object1 } = await storageManager.collection('object').createObject({field: 1})
+        const { object: object2 } = await storageManager.collection('object').createObject({field: 2})
+        const { object: object3 } = await storageManager.collection('object').createObject({field: 3})
+        await storageManager.collection('object').deleteObjects({id: {$in: [object1.id, object2.id]}})
+        const results = await storageManager.collection('object').findObjects({})
+        expect(await storageManager.collection('object').findObjects({})).toEqual([
+            expect.objectContaining({id: object3.id})
+        ])
+    })
 
     // testStorageBackend(async () => {
     //     return new FirestoreStorageBackend({firestore: firebase.firestore(), rootRef: unittestFirestoreRef})

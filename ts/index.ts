@@ -106,6 +106,22 @@ export class FirestoreStorageBackend extends StorageBackend {
     }
     
     async deleteObjects(collection : string, query, options : backend.DeleteManyOptions) : Promise<backend.DeleteManyResult> {
+        const collectionDefiniton = this.registry.collections[collection]
+        const pkIndex = collectionDefiniton.pkIndex as string
+        if (Object.keys(query).length > 1 && !query[pkIndex]) {
+            throw new Error('Only deletes by pk are supported for now')
+        }
+
+        const firestoreCollection = this.getFirestoreCollection(collection)
+        if (!query[pkIndex]['$in']) {
+            await firestoreCollection.doc(query[pkIndex]).delete()
+        } else {
+            const batch = this.firestore.batch()
+            for (const pk of query[pkIndex]['$in']) {
+                batch.delete(firestoreCollection.doc(pk))
+            }
+            await batch.commit()
+        }
     }
 
     async executeBatch(operations : {operation : 'createObject', collection? : string, args : any, placeholder? : string, replace? : {path : string, placeholder : string}[]}[]) {
