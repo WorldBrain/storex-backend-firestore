@@ -4,7 +4,7 @@ import * as expect from 'expect'
 import * as firebase from 'firebase'
 import StorageManager from "@worldbrain/storex"
 import { createTestStorageManager, testStorageBackend } from "@worldbrain/storex/lib/index.tests"
-import { FirestoreStorageBackend } from ".";
+import { FirestoreStorageBackend, _parseQueryWhere } from ".";
 // import extractTerms from "@worldbrain/memex-stemmer";
 // import { DexieStorageBackend } from "."
 // import inMemory from './in-memory'
@@ -25,7 +25,7 @@ describe('FirestoreStorageBackend integration tests', () => {
         return { backend, storageManager }
     }
 
-    async function setupSimpleTest({userFields = null} = {}) {
+    async function setupChildOfTest({userFields = null} = {}) {
         const backend = await createBackend()
         const storageManager = new StorageManager({backend})
         storageManager.registry.registerCollections({
@@ -44,6 +44,21 @@ describe('FirestoreStorageBackend integration tests', () => {
                     {childOf: 'user'}
                 ]
             }
+        })
+        await storageManager.finishInitialization()
+        return { storageManager }
+    }
+
+    async function setupOperatorTest({fieldType}) {
+        const backend = await createBackend()
+        const storageManager = new StorageManager({backend})
+        storageManager.registry.registerCollections({
+            object: {
+                version: new Date(2019, 1, 1),
+                fields: {
+                    field: {type: fieldType}
+                }
+            },
         })
         await storageManager.finishInitialization()
         return { storageManager }
@@ -92,6 +107,16 @@ describe('FirestoreStorageBackend integration tests', () => {
         })
     })
 
+    it('should be able to find by $lt operator', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 3})
+        const results = await storageManager.collection('object').findObjects({field: {$lt: 3}})
+        expect(results).toContainEqual(expect.objectContaining({field: 1}))
+        expect(results).toContainEqual(expect.objectContaining({field: 2}))
+    })
+
     it('should be able to update objects by string pk', async () => {
         const { storageManager } = await setupUserAdminTest()
         const { object } = await storageManager.collection('user').createObject({identifier: 'email:joe@doe.com', isActive: false})
@@ -117,7 +142,7 @@ describe('FirestoreStorageBackend integration tests', () => {
     })
 
     it('should correctly do batch operations containing only creates', async () => {
-        const { storageManager } = await setupSimpleTest()
+        const { storageManager } = await setupChildOfTest()
         const { info } = await storageManager.operation('executeBatch', [
             {
                 placeholder: 'jane',
@@ -174,7 +199,7 @@ describe('FirestoreStorageBackend integration tests', () => {
     })
 
     it('should be able to do complex creates', async () => {
-        const { storageManager } = await setupSimpleTest()
+        const { storageManager } = await setupChildOfTest()
         const { object } = await storageManager.collection('user').createObject({
             displayName: 'Jane',
             emails: [{address: 'jane@doe.com'}]
@@ -198,11 +223,37 @@ describe('FirestoreStorageBackend integration tests', () => {
         })
     })
 
+    it('should be able to delete objects')
+
     // testStorageBackend(async () => {
     //     return new FirestoreStorageBackend({firestore: firebase.firestore(), rootRef: unittestFirestoreRef})
     // })
 
     afterEach(async () => {
         await unittestFirestoreRef.delete()
+    })
+})
+
+describe('Query where parsing', () => {
+    it('should parse a where query containing only equalities correctly', () => {
+        expect(_parseQueryWhere({foo: 5, bar: 6})).toEqual([
+            {field: 'foo', operator: '$eq', value: 5},
+            {field: 'bar', operator: '$eq', value: 6},
+        ])
+    })
+
+    it('should parse a where query containing dollar operators', () => {
+        expect(_parseQueryWhere({foo: 5, bar: {$lt: 7}})).toEqual([
+            {field: 'foo', operator: '$eq', value: 5},
+            {field: 'bar', operator: '$lt', value: 7},
+        ])
+    })
+
+    it('should parse a where query containing multiple dollar operators for the same field', () => {
+        expect(_parseQueryWhere({foo: 5, bar: {$gt: 6, $lt: 10}})).toEqual([
+            {field: 'foo', operator: '$eq', value: 5},
+            {field: 'bar', operator: '$gt', value: 6},
+            {field: 'bar', operator: '$lt', value: 10},
+        ])
     })
 })

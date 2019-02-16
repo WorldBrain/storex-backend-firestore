@@ -3,6 +3,14 @@ import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, set
 import { StorageBackend } from '@worldbrain/storex/lib/types/backend'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 
+const WHERE_OPERATORS = {
+    '$eq': '==',
+    '$lt': '<',
+    '$lte': '<=',
+    '$gt': '>=',
+    '$gte': '>=',
+}
+
 export class FirestoreStorageBackend extends StorageBackend {
     features = {
         executeBatch: true,
@@ -125,4 +133,31 @@ export class FirestoreStorageBackend extends StorageBackend {
     getFirestoreCollection(collection : string) {
         return this.rootRef ? this.rootRef.collection(collection) : this.firestore.collection(collection)
     }
+}
+
+export function _parseQueryWhere(where) : Array<{field : string, operator : string, value : any}> {
+    const parsed = []
+    for (const [field, operatorAndValue] of Object.entries(where)) {
+        let valueEntries = null
+        try {
+            valueEntries = Object.entries(operatorAndValue)
+        } catch (e) {
+            if (!(e instanceof TypeError)) {
+                throw e
+            }
+        }
+
+        if (!valueEntries || !valueEntries.length || (valueEntries.length === 1 && valueEntries[0][0].substr(0, 1) !== '$')) {
+            parsed.push({
+                field,
+                operator: '$eq',
+                value: operatorAndValue
+            })
+        } else {
+            for (const [operator, value] of valueEntries) {
+                parsed.push({field, operator, value})
+            }
+        }
+    }
+    return parsed
 }
