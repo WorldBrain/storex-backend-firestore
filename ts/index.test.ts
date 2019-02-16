@@ -235,7 +235,14 @@ describe('FirestoreStorageBackend integration tests', () => {
 })
 
 describe('Query where parsing', () => {
-    it('should parse a where query containing only equalities correctly', () => {
+    it('should parse a where query containing only string equalities correctly', () => {
+        expect(_parseQueryWhere({foo: 'spam', bar: 'eggs'})).toEqual([
+            {field: 'foo', operator: '$eq', value: 'spam'},
+            {field: 'bar', operator: '$eq', value: 'eggs'},
+        ])
+    })
+
+    it('should parse a where query containing only number equalities correctly', () => {
         expect(_parseQueryWhere({foo: 5, bar: 6})).toEqual([
             {field: 'foo', operator: '$eq', value: 5},
             {field: 'bar', operator: '$eq', value: 6},

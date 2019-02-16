@@ -73,10 +73,9 @@ export class FirestoreStorageBackend extends StorageBackend {
             return [addPk(object, query[pkIndex])]
         } else {
             let q : firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
-            for (const [key, value] of Object.entries(query)) {
-                if (key.charAt(0) !== '$') {
-                    q = q.where(key, '==', value)
-                }
+            console.log(_parseQueryWhere(query))
+            for (const {field, operator, value} of _parseQueryWhere(query)) {
+                q = q.where(field, WHERE_OPERATORS[operator], value)
             }
             const results = await q.get()
             return results.docs.map(doc => addPk(doc.data(), doc.id) as T)
@@ -147,7 +146,7 @@ export function _parseQueryWhere(where) : Array<{field : string, operator : stri
             }
         }
 
-        if (!valueEntries || !valueEntries.length || (valueEntries.length === 1 && valueEntries[0][0].substr(0, 1) !== '$')) {
+        if (!valueEntries || !valueEntries.length || valueEntries[0][0].substr(0, 1) !== '$') {
             parsed.push({
                 field,
                 operator: '$eq',
