@@ -4,7 +4,7 @@ Usage
 =====
 
 ```
-$ npm install @worldbrain/storex @worldbrain/store-backend-firestore
+$ npm install @worldbrain/storex @worldbrain/storex-backend-firestore
 ````
 
 See main Storex repo for futher docs
