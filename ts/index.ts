@@ -79,6 +79,9 @@ export class FirestoreStorageBackend extends StorageBackend {
             for (const [field, order] of options.order || []) {
                 q = q.orderBy(field, order)
             }
+            if (options.limit) {
+                q = q.limit(options.limit)
+            }
             const results = await q.get()
             return results.docs.map(doc => addPk(doc.data(), doc.id) as T)
         }
