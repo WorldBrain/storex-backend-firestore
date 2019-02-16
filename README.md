@@ -4,7 +4,7 @@ Usage
 =====
 
 ```
-$ npm install storex store-backend-firestore
+$ npm install @worldbrain/storex @worldbrain/store-backend-firestore
 ````
 
 See main Storex repo for futher docs
@@ -27,3 +27,24 @@ TBD
 - Media field support integrating with Firebase Cloud Storage
 
 Note: Firebase Realtime database support should be a separate back-end
+
+Development
+===========
+
+Create a new Firebase project for unit testing, and create the file `<this-repo>/private/firebase.json` (in `.gitgnore` so it doesn't accidentally go public) with the following contents:
+
+```
+{
+    "apiKey": "xxxx",
+    "authDomain": "xxx.firebaseapp.com",
+    "databaseURL": "https://xxxx.firebaseio.com",
+    "projectId": "xxxxx",
+    "storageBucket": "xxxx.appspot.com",
+    "messagingSenderId": "xxxxx"
+}
+```
+
+Then continuously run the tests while developing:
+```
+$ npm run test:watch
+```
