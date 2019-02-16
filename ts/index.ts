@@ -73,7 +73,6 @@ export class FirestoreStorageBackend extends StorageBackend {
             return [addPk(object, query[pkIndex])]
         } else {
             let q : firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
-            console.log(_parseQueryWhere(query))
             for (const {field, operator, value} of _parseQueryWhere(query)) {
                 q = q.where(field, WHERE_OPERATORS[operator], value)
             }

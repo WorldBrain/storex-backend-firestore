@@ -12,7 +12,7 @@ import { FirestoreStorageBackend, _parseQueryWhere } from ".";
 const FIREBASE_CONFIG_PATH = path.join(__dirname, '..', 'private', 'firebase.json')
 const FIREBASE_CONFIG = JSON.parse(fs.readFileSync(FIREBASE_CONFIG_PATH).toString())
 
-describe('FirestoreStorageBackend integration tests', () => {
+describe('FirestoreStorageBackend', () => {
     let unittestFirestoreRef : firebase.firestore.DocumentReference
 
     async function createBackend() {
@@ -115,6 +115,36 @@ describe('FirestoreStorageBackend integration tests', () => {
         const results = await storageManager.collection('object').findObjects({field: {$lt: 3}})
         expect(results).toContainEqual(expect.objectContaining({field: 1}))
         expect(results).toContainEqual(expect.objectContaining({field: 2}))
+    })
+
+    it('should be able to find by $lte operator', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 3})
+        const results = await storageManager.collection('object').findObjects({field: {$lte: 2}})
+        expect(results).toContainEqual(expect.objectContaining({field: 1}))
+        expect(results).toContainEqual(expect.objectContaining({field: 2}))
+    })
+
+    it('should be able to find by $gt operator', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 3})
+        const results = await storageManager.collection('object').findObjects({field: {$gt: 1}})
+        expect(results).toContainEqual(expect.objectContaining({field: 2}))
+        expect(results).toContainEqual(expect.objectContaining({field: 3}))
+    })
+
+    it('should be able to find by $gte operator', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 3})
+        const results = await storageManager.collection('object').findObjects({field: {$gte: 2}})
+        expect(results).toContainEqual(expect.objectContaining({field: 2}))
+        expect(results).toContainEqual(expect.objectContaining({field: 3}))
     })
 
     it('should be able to update objects by string pk', async () => {
