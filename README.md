@@ -16,3 +16,14 @@ Limitations
 - You cannot use the `$ne` operator ([Firestore docs](https://firebase.google.com/docs/firestore/query-data/queries#query_limitations))
 - No logical ORs ([Firestore docs](https://firebase.google.com/docs/firestore/query-data/queries#query_limitations))
 - Skipping the first X items in an ordered retrieve is done client-side, so it is recommended to increase the lower limit of your resultset instead (`findObjects({foo: {$gt: X + Y}})` rather than `findObjects({foo: {$gt: X}, {skip: Y}})`)
+
+TBD
+===
+
+- Automatic security rule generation
+- Ability to easily move StorageModules to Firebase Functions
+- Back-end agnostic automatic processes, which whould be Firebase Functions listening to certain queries in this backend
+- Subcollection support (after investigations on real-world performance benefits)
+- Media field support integrating with Firebase Cloud Storage
+
+Note: Firebase Realtime database support should be a separate back-end
