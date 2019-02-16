@@ -69,7 +69,11 @@ export class FirestoreStorageBackend extends StorageBackend {
 
         const firestoreCollection = this.getFirestoreCollection(collection)
         if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
-            const object = (await firestoreCollection.doc(query[pkIndex]).get()).data() as T
+            const result = await firestoreCollection.doc(query[pkIndex]).get()
+            if (!result.exists) {
+                return []
+            }
+            const object = result.data() as T
             return [addPk(object, query[pkIndex])]
         } else {
             let q : firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
@@ -84,8 +88,8 @@ export class FirestoreStorageBackend extends StorageBackend {
             }
             const results = await q.get()
             const docs = options.skip ? results.docs.slice(options.skip) : results.docs
-
-            return docs.map(doc => addPk(doc.data(), doc.id) as T)
+            const objects = docs.map(doc => addPk(doc.data(), doc.id) as T)
+            return objects
         }
     }
     

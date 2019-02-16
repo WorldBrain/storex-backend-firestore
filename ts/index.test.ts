@@ -3,7 +3,7 @@ import * as path from 'path'
 import * as expect from 'expect'
 import * as firebase from 'firebase'
 import StorageManager from "@worldbrain/storex"
-import { createTestStorageManager, testStorageBackend } from "@worldbrain/storex/lib/index.tests"
+import { createTestStorageManager, testStorageBackend, generateTestObject } from "@worldbrain/storex/lib/index.tests"
 import { FirestoreStorageBackend, _parseQueryWhere } from ".";
 // import extractTerms from "@worldbrain/memex-stemmer";
 // import { DexieStorageBackend } from "."
@@ -345,9 +345,7 @@ describe('FirestoreStorageBackend', () => {
         ])
     })
 
-    // testStorageBackend(async () => {
-    //     return new FirestoreStorageBackend({firestore: firebase.firestore(), rootRef: unittestFirestoreRef})
-    // })
+    testStorageBackend(createBackend)
 
     afterEach(async () => {
         await unittestFirestoreRef.delete()
