@@ -147,6 +147,30 @@ describe('FirestoreStorageBackend', () => {
         expect(results).toContainEqual(expect.objectContaining({field: 3}))
     })
 
+    it('should be able to order results in ascending order', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 3})
+        expect(await storageManager.collection('object').findObjects({field: {$gte: 1}}, {order: [['field', 'asc']]})).toEqual([
+            expect.objectContaining({field: 1}),
+            expect.objectContaining({field: 2}),
+            expect.objectContaining({field: 3}),
+        ])
+    })
+
+    it('should be able to order results in descending order', async () => {
+        const { storageManager } = await setupOperatorTest({fieldType: 'number'})
+        await storageManager.collection('object').createObject({field: 2})
+        await storageManager.collection('object').createObject({field: 1})
+        await storageManager.collection('object').createObject({field: 3})
+        expect(await storageManager.collection('object').findObjects({field: {$gte: 1}}, {order: [['field', 'desc']]})).toEqual([
+            expect.objectContaining({field: 3}),
+            expect.objectContaining({field: 2}),
+            expect.objectContaining({field: 1}),
+        ])
+    })
+
     it('should be able to update objects by string pk', async () => {
         const { storageManager } = await setupUserAdminTest()
         const { object } = await storageManager.collection('user').createObject({identifier: 'email:joe@doe.com', isActive: false})

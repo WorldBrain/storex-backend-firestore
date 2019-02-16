@@ -76,6 +76,9 @@ export class FirestoreStorageBackend extends StorageBackend {
             for (const {field, operator, value} of _parseQueryWhere(query)) {
                 q = q.where(field, WHERE_OPERATORS[operator], value)
             }
+            for (const [field, order] of options.order || []) {
+                q = q.orderBy(field, order)
+            }
             const results = await q.get()
             return results.docs.map(doc => addPk(doc.data(), doc.id) as T)
         }
