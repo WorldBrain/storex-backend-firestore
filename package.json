@@ -23,7 +23,7 @@
   ],
   "author": "Vincent den Boer",
   "dependencies": {
-    "@worldbrain/storex": "^0.2.1",
+    "@worldbrain/storex": "^0.3.1",
     "firebase": "^5.8.2",
     "lodash": "^4.17.10",
     "source-map-support": "^0.4.18"

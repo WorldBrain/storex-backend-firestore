@@ -39,18 +39,6 @@ export class FirestoreStorageBackend extends StorageBackend {
         return { object }
     }
 
-    async _createSingleObject(collection : string, object) {
-        const collectionDefiniton = this.registry.collections[collection]
-        const pkIndex = collectionDefiniton.pkIndex
-        const docRef = await this.getFirestoreCollection(collection).add(object)
-        let objectToReturn
-        if (typeof pkIndex === 'string') {
-            objectToReturn = {...object, [pkIndex]: docRef.id}
-        }
-        
-        return { object: objectToReturn }
-    }
-    
     async findObjects<T>(collection : string, query, options : backend.FindManyOptions = {}) : Promise<Array<T>> {
         const collectionDefiniton = this.registry.collections[collection]
         const pkIndex = collectionDefiniton.pkIndex
@@ -67,7 +55,7 @@ export class FirestoreStorageBackend extends StorageBackend {
             }
         }
 
-        const firestoreCollection = this.getFirestoreCollection(collection)
+        const firestoreCollection = this.getFirestoreCollection(collection, { forObject: query })
         if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
             const result = await firestoreCollection.doc(query[pkIndex]).get()
             if (!result.exists) {
@@ -96,7 +84,7 @@ export class FirestoreStorageBackend extends StorageBackend {
     async updateObjects(collection : string, query, updates, options : backend.UpdateManyOptions) : Promise<backend.UpdateManyResult> {
         const collectionDefiniton = this.registry.collections[collection]
         const pkIndex = collectionDefiniton.pkIndex
-        const firestoreCollection = this.getFirestoreCollection(collection)
+        const firestoreCollection = this.getFirestoreCollection(collection, { forObject: query })
         if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
             await firestoreCollection.doc(query[pkIndex]).update(updates)
         } else {
@@ -116,7 +104,7 @@ export class FirestoreStorageBackend extends StorageBackend {
             throw new Error('Only deletes by pk are supported for now')
         }
 
-        const firestoreCollection = this.getFirestoreCollection(collection)
+        const firestoreCollection = this.getFirestoreCollection(collection, { forObject: query })
         if (!query[pkIndex]['$in']) {
             await firestoreCollection.doc(query[pkIndex]).delete()
         } else {
@@ -128,24 +116,35 @@ export class FirestoreStorageBackend extends StorageBackend {
         }
     }
 
-    async executeBatch(operations : {operation : 'createObject', collection? : string, args : any, placeholder? : string, replace? : {path : string, placeholder : string}[]}[]) {
+    async executeBatch(operations : backend.OperationBatch) {
         const batch = this.firestore.batch()
         const info = {}
         const pks = {}
         for (const operation of operations) {
             if (operation.operation === 'createObject') {
+                const collectionDefiniton = this.registry.collections[operation.collection]
+                
                 const toInsert = operation.args
                 for (const {path, placeholder} of operation.replace || []) {
                     toInsert[path] = pks[placeholder]
                 }
                 
-                const firestoreCollection = this.getFirestoreCollection(operation.collection)
-                const docRef = firestoreCollection.doc()
+                let firestoreCollection = this.getFirestoreCollection(operation.collection, {
+                    forObject: toInsert,
+                })
+
+                let docRef : firebase.firestore.DocumentReference
+                if (collectionDefiniton.fields[collectionDefiniton.pkIndex as string].type === 'auto-pk') {
+                    docRef = firestoreCollection.doc()
+                } else {
+                    docRef = firestoreCollection.doc(toInsert[collectionDefiniton.pkIndex as string])
+                    delete toInsert[collectionDefiniton.pkIndex as string]
+                }
+
                 batch.set(docRef, toInsert)
                 const pk = docRef.id
                 pks[operation.placeholder] = pk
 
-                const collectionDefiniton = this.registry.collections[operation.collection]
                 const pkIndex = collectionDefiniton.pkIndex
                 info[operation.placeholder] = {object: {[pkIndex as string]: pk, ...toInsert}}
             } else {
@@ -156,8 +155,18 @@ export class FirestoreStorageBackend extends StorageBackend {
         return { info }
     }
 
-    getFirestoreCollection(collection : string) {
-        return this.rootRef ? this.rootRef.collection(collection) : this.firestore.collection(collection)
+    getFirestoreCollection(collection : string, options? : { forObject? : any } ) {
+        const collectionDefiniton = this.registry.collections[collection]
+        
+        let firestoreCollection = this.rootRef ? this.rootRef.collection(collection) : this.firestore.collection(collection)
+        if (options && options.forObject) {
+            for (const group of collectionDefiniton.groupBy || []) {
+                firestoreCollection = firestoreCollection.doc(options.forObject[group.key]).collection(group.subcollectionName)
+                delete options.forObject[group.key]
+            }
+        }
+
+        return firestoreCollection
     }
 }
 

@@ -9,10 +9,23 @@ import { FirestoreStorageBackend, _parseQueryWhere } from ".";
 // import { DexieStorageBackend } from "."
 // import inMemory from './in-memory'
 
-const FIREBASE_CONFIG_PATH = path.join(__dirname, '..', 'private', 'firebase.json')
-const FIREBASE_CONFIG = JSON.parse(fs.readFileSync(FIREBASE_CONFIG_PATH).toString())
+const SHOULD_RUN_FIRESTORE_TESTS = process.env.TEST_FIRESTORE === 'true'
+if (!SHOULD_RUN_FIRESTORE_TESTS) {
+    console.warn(`WARNING: Didn't specificy TEST_FIRESTORE=true, so not running Firestore tests`)
+}
 
 describe('FirestoreStorageBackend', () => {
+    const getFirebaseConfig = (() => {
+        let config = null
+        return () => {
+            if (!config) {
+                const firebaseConfigPath = path.join(__dirname, '..', 'private', 'firebase.json')
+                config = JSON.parse(fs.readFileSync(firebaseConfigPath).toString())
+            }
+            return config
+        }
+    })()
+    
     let unittestFirestoreRef : firebase.firestore.DocumentReference
 
     async function createBackend() {
@@ -20,16 +33,21 @@ describe('FirestoreStorageBackend', () => {
     }
 
     before(async () => {
-        if (!firebase.apps.length) {
-            await firebase.initializeApp(FIREBASE_CONFIG)
+        if (SHOULD_RUN_FIRESTORE_TESTS && !firebase.apps.length) {
+            await firebase.initializeApp(getFirebaseConfig())
         }
     })
 
-    beforeEach(async () => {
+    beforeEach(async function() {
+        if (!SHOULD_RUN_FIRESTORE_TESTS) {
+            this.skip()
+        }
+
         unittestFirestoreRef = await firebase.firestore().collection('unittests').add({})
     })
 
     testStorageBackend(createBackend)
+    testFirestoreSpecifics(createBackend)
 
     afterEach(async () => {
         await unittestFirestoreRef.delete()
@@ -66,3 +84,59 @@ describe('Query where parsing', () => {
         ])
     })
 })
+
+function testFirestoreSpecifics(createBackend : () => Promise<FirestoreStorageBackend>) {
+    describe('collection grouping', () => {
+        it('should correctly store collections grouped by fields', async () => {
+            const backend = await createBackend()
+            const storageManager = new StorageManager({ backend: backend })
+            storageManager.registry.registerCollections({
+                note: {
+                    version: new Date(),
+                    fields: {
+                        userId: { type: 'string' },
+                        listId: { type: 'string' },
+                        label: { type: 'string' },
+                    },
+                    groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
+                    pkIndex: 'listId'
+                },
+            })
+            await storageManager.finishInitialization()
+
+            await storageManager.collection('note').createObject({ userId: 'user-1', listId: 'list-1', label: 'foo note' })
+            const snapshot = await backend.getFirestoreCollection('note')
+                .doc('user-1').collection('lists').doc('list-1')
+                .get()
+            
+            expect(snapshot.data()).toEqual({
+                label: 'foo note' 
+            })
+        })
+
+        it('should correctly retrieve collections grouped by fields', async () => {
+            const backend = await createBackend()
+            const storageManager = new StorageManager({ backend: backend })
+            storageManager.registry.registerCollections({
+                note: {
+                    version: new Date(),
+                    fields: {
+                        userId: { type: 'string' },
+                        listId: { type: 'string' },
+                        label: { type: 'string' },
+                    },
+                    groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
+                    pkIndex: 'listId'
+                },
+            })
+            await storageManager.finishInitialization()
+
+            await storageManager.collection('note').createObject({ userId: 'user-1', listId: 'list-1', label: 'foo note' })
+            
+            const notes = await storageManager.collection('note').findObjects({ userId: 'user-1', listId: 'list-1' })
+            expect(notes).toEqual([
+                { userId: 'user-1', listId: 'list-1', label: 'foo note' }
+            ])
+        })
+    })
+}
