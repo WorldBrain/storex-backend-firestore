@@ -1,7 +1,7 @@
 import * as firebase from 'firebase'
 import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, setIn } from '@worldbrain/storex/lib/utils'
-import { StorageBackend } from '@worldbrain/storex/lib/types/backend'
 import * as backend from '@worldbrain/storex/lib/types/backend'
+import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
 
 const WHERE_OPERATORS = {
     '$eq': '==',
@@ -11,9 +11,10 @@ const WHERE_OPERATORS = {
     '$gte': '>=',
 }
 
-export class FirestoreStorageBackend extends StorageBackend {
-    features = {
+export class FirestoreStorageBackend extends backend.StorageBackend {
+    features : StorageBackendFeatureSupport = {
         executeBatch: true,
+        collectionGrouping: true,
     }
     firestore : firebase.firestore.Firestore
     rootRef : firebase.firestore.DocumentReference
@@ -43,16 +44,24 @@ export class FirestoreStorageBackend extends StorageBackend {
         const collectionDefiniton = this.registry.collections[collection]
         const pkIndex = collectionDefiniton.pkIndex
 
-        const addPk = (object, pk) => {
+        const pairsToInclude = (collectionDefiniton.groupBy || []).map(
+            group => [group.key, query[group.key]]
+        )
+        const addKeys = (object, pk) => {
+            let withPk
             if (typeof pkIndex === 'string') {
-                return {[pkIndex]: pk, ...object}
+                withPk = {[pkIndex]: pk, ...object}
             } else {
-                const withPk = {...object}
+                withPk = {...object}
                 for (const pkField of pkIndex) {
                     withPk[pkField as string] = object[pkField as string]
                 }
-                return withPk
             }
+            for (const [key, value] of pairsToInclude) {
+                withPk[key] = value
+            }
+
+            return withPk
         }
 
         const firestoreCollection = this.getFirestoreCollection(collection, { forObject: query })
@@ -62,7 +71,7 @@ export class FirestoreStorageBackend extends StorageBackend {
                 return []
             }
             const object = result.data() as T
-            return [addPk(object, query[pkIndex])]
+            return [addKeys(object, query[pkIndex])]
         } else {
             let q : firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
             for (const {field, operator, value} of _parseQueryWhere(query)) {
@@ -76,7 +85,7 @@ export class FirestoreStorageBackend extends StorageBackend {
             }
             const results = await q.get()
             const docs = options.skip ? results.docs.slice(options.skip) : results.docs
-            const objects = docs.map(doc => addPk(doc.data(), doc.id) as T)
+            const objects = docs.map(doc => addKeys(doc.data(), doc.id) as T)
             return objects
         }
     }
