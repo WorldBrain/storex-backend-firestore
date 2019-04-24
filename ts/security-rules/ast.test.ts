@@ -2,107 +2,135 @@ import * as expect from 'expect'
 const stripIndent = require('strip-indent')
 import { serializeRulesAST as serializeRulesAst, MatchNode } from './ast';
 
-describe('Rules AST serialization', () => {
+function normalizeEmptyLines(s : string) {
+    return s.replace(/^\s+$/mg, '');
+}
+
+export function expectSecurityRulesSerialization(root : MatchNode, expected : string) {
+    expect('\n' + normalizeEmptyLines(stripIndent(serializeRulesAst(root))))
+            .toEqual(normalizeEmptyLines(stripIndent(expected)))
+}
+
+describe('Security rules AST serialization', () => {
+    function runTest(options : { root : MatchNode, expected : string }) {
+        expectSecurityRulesSerialization(options.root, options.expected)
+    }
+    
     it('should correctly serialize match nodes', () => {
-        expect('\n' + stripIndent(serializeRulesAst({
-            type: 'match',
-            path: '/databases/{database}/documents',
-            content: []
-        }))).toEqual(stripIndent(`
-        service cloud.firestore {
-            match /databases/{database}/documents {
-            
-            }
-        }`))
+        runTest({
+            root: {
+                type: 'match',
+                path: '/databases/{database}/documents',
+                content: []
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    
+                }
+            }`
+        })
     })
-
+    
     it('should correctly serialize nested match nodes', () => {
-        expect('\n' + stripIndent(serializeRulesAst({
-            type: 'match',
-            path: '/databases/{database}/documents',
-            content: [
-                {
-                    type: 'match',
-                    path: '/test',
-                    content: []
+        runTest({
+            root: {
+                type: 'match',
+                path: '/databases/{database}/documents',
+                content: [
+                    {
+                        type: 'match',
+                        path: '/test',
+                        content: []
+                    }
+                ]
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    match /test {
+                        
+                    }
                 }
-            ]
-        }))).toEqual(stripIndent(`
-        service cloud.firestore {
-            match /databases/{database}/documents {
-                match /test {
-                
-                }
-            }
-        }`))
+            }`
+        })
     })
-
+    
     it('should correctly serialize multiple nested match nodes', () => {
-        expect('\n' + stripIndent(serializeRulesAst({
-            type: 'match',
-            path: '/databases/{database}/documents',
-            content: [
-                {
-                    type: 'match',
-                    path: '/foo',
-                    content: []
-                },
-                {
-                    type: 'match',
-                    path: '/bar',
-                    content: []
-                },
-            ]
-        }))).toEqual(stripIndent(`
-        service cloud.firestore {
-            match /databases/{database}/documents {
-                match /foo {
-                
+        runTest({
+            root: {
+                type: 'match',
+                path: '/databases/{database}/documents',
+                content: [
+                    {
+                        type: 'match',
+                        path: '/foo',
+                        content: []
+                    },
+                    {
+                        type: 'match',
+                        path: '/bar',
+                        content: []
+                    },
+                ]
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    match /foo {
+                        
+                    }
+                    match /bar {
+                        
+                    }
                 }
-                match /bar {
-                
-                }
-            }
-        }`))
+            }`
+        })
     })
-
+    
     it('should correctly serialize allow nodes', () => {
-        expect('\n' + stripIndent(serializeRulesAst({
-            type: 'match',
-            path: '/databases/{database}/documents',
-            content: [
-                {
-                    type: 'allow',
-                    operations: ['list', 'get'],
-                    condition: 'true'
+        runTest({
+            root: {
+                type: 'match',
+                path: '/databases/{database}/documents',
+                content: [
+                    {
+                        type: 'allow',
+                        operations: ['list', 'get'],
+                        condition: 'true'
+                    }
+                ]
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    allow list, get: if true;
                 }
-            ]
-        }))).toEqual(stripIndent(`
-        service cloud.firestore {
-            match /databases/{database}/documents {
-                allow list, get: if true;
-            }
-        }`))
+            }`
+        })
     })
-
+    
     it('should correctly serialize function nodes', () => {
-        expect('\n' + stripIndent(serializeRulesAst({
-            type: 'match',
-            path: '/databases/{database}/documents',
-            content: [
-                {
-                    type: 'function',
-                    name: 'getTest',
-                    returnValue: 'true'
+        runTest({
+            root: {
+                type: 'match',
+                path: '/databases/{database}/documents',
+                content: [
+                    {
+                        type: 'function',
+                        name: 'getTest',
+                        returnValue: 'true'
+                    }
+                ]
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    function getTest() {
+                        return true;
+                    }
                 }
-            ]
-        }))).toEqual(stripIndent(`
-        service cloud.firestore {
-            match /databases/{database}/documents {
-                function getTest() {
-                    return true;
-                }
-            }
-        }`))
+            }`
+        })
     })
 })
