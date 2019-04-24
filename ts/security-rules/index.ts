@@ -1,11 +1,11 @@
 import * as flatten from 'lodash/flatten'
 import { StorageRegistry, CollectionDefinition } from "@worldbrain/storex";
-import { StorageModuleInterface, StorageModuleConfig, AccessType } from "@worldbrain/storex-pattern-modules";
+import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules } from "@worldbrain/storex-pattern-modules";
 import { MatchNode, AllowOperation } from "./ast";
 
 type BaseInfo = {}
 type ModuleInfo = BaseInfo & { moduleName : string }
-type CollectionInfo = ModuleInfo & { collectionName : string }
+type CollectionInfo = ModuleInfo & { collectionName : string, accessRules : AccessRules }
 
 const FIELD_TYPE_MAP = {
     boolean: 'bool',
@@ -42,7 +42,7 @@ export function generateModuleNode(module : StorageModuleConfig, options : Modul
     }
 
     return Object.entries(module.collections)
-        .map(([collectionName, collection]) => generateCollectionNode(collection, { ...options, collectionName }))
+        .map(([collectionName, collection]) => generateCollectionNode(collection, { ...options, collectionName, accessRules: module.accessRules }))
         .filter(node => !!node)
 }
 
@@ -56,10 +56,21 @@ export function generateCollectionNode(collection : CollectionDefinition, option
     const accessTypes : AccessType[] = ['list', 'read', 'create', 'update', 'delete']
     for (const accessType of accessTypes) {
         const expressions : string[] = []
-        if (accessType === 'create' || accessType === 'update') {
+        if (accessType === 'create' || accessType === 'update' || accessType === 'delete') {
+            const ownershipCheck = generateOwnershipCheck(collection, { ...options, accessType })
+            if (ownershipCheck) {
+                expressions.push(ownershipCheck)
+            }
+
+            const permissionChecks = generatePermissionChecks(collection, { ...options, accessType }).join(' && ')
+            if (permissionChecks) {
+                expressions.push(permissionChecks)
+            }
+        }
+        if (expressions.length && (accessType === 'create' || accessType === 'update')) {
             const typeChecks = generateFieldTypeChecks(collection, options).join(' && ')
-            if (typeChecks) {
-                expressions.push(typeChecks)
+            if (typeChecks.length) {
+                expressions.unshift(typeChecks)
             }
         }
 
@@ -94,4 +105,32 @@ export function generateFieldTypeChecks(collection : CollectionDefinition, optio
         checks.push(check)
     }
     return checks
+}
+
+export function generateOwnershipCheck(collection : CollectionDefinition, options : CollectionInfo & { accessType : AccessType }) : string | null {
+    const ownershipRule = options.accessRules.ownership && options.accessRules.ownership[options.collectionName]
+    if (!ownershipRule) {
+        return null
+    }
+
+    const accessTypeMatches = ownershipRule.access !== 'full' && ownershipRule.access.indexOf(options.accessType) >= 0
+    if (!accessTypeMatches) {
+        return null
+    }
+
+    return `request.auth.uid === resource.data.${ownershipRule.field}`
+}
+
+export function generatePermissionChecks(collection : CollectionDefinition, options : CollectionInfo & { accessType : AccessType }) : string[] {
+    const permissionRules = options.accessRules.permissions && options.accessRules.permissions[options.collectionName]
+    if (!permissionRules) {
+        return []
+    }
+
+    const accessTypeRule = permissionRules[options.accessType]
+    if (!accessTypeRule) {
+        return []
+    }
+
+    return [accessTypeRule.rule as string]
 }
