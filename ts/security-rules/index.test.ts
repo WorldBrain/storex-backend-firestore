@@ -122,5 +122,79 @@ describe('Firestore security rules generation', () => {
                 }`
             })
         })
+
+        it('should generate ownership rules for objects that have owner IDs as their PK', async () => {
+            await runTest({
+                modules: {
+                    test: {
+                        collections: {
+                            foo: {
+                                version: new Date(),
+                                fields: {
+                                    userId: { type: 'string' },
+                                    fieldBool: { type: 'boolean' },
+                                },
+                                pkIndex: 'userId',
+                            },
+                        },
+                        accessRules: {
+                            ownership: {
+                                foo: {
+                                    field: 'userId',
+                                    access: ['create']
+                                }
+                            }
+                        }
+                    },
+                },
+                expected: `
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /foo/{userId} {
+                            allow create: if resource.data.fieldBool is bool && request.auth.uid === userId;
+                        }
+                    }
+                }`
+            })
+        })
+
+        it('should generate ownership rules for objects that have owner IDs as their PKs in grouped collections', async () => {
+            await runTest({
+                modules: {
+                    test: {
+                        collections: {
+                            foo: {
+                                version: new Date(),
+                                fields: {
+                                    userId: { type: 'string' },
+                                    listId: { type: 'string' },
+                                    fieldBool: { type: 'boolean' },
+                                },
+                                groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
+                                pkIndex: 'listId',
+                            },
+                        },
+                        accessRules: {
+                            ownership: {
+                                foo: {
+                                    field: 'userId',
+                                    access: ['create']
+                                }
+                            }
+                        }
+                    },
+                },
+                expected: `
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /foo/{userId} {
+                            match /lists/{listId} {
+                                allow create: if resource.data.fieldBool is bool && request.auth.uid === userId;
+                            }
+                        }
+                    }
+                }`
+            })
+        })
     })
 })
