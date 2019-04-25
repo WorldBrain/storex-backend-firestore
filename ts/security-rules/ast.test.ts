@@ -2,13 +2,13 @@ import * as expect from 'expect'
 const stripIndent = require('strip-indent')
 import { serializeRulesAST as serializeRulesAst, MatchNode } from './ast';
 
-function normalizeEmptyLines(s : string) {
-    return s.replace(/^\s+$/mg, '');
+function normalizeWithSpace(s : string) : string {
+    return s.replace(/^\s+$/mg, '').split('\n').map(line => line.trimRight()).join('\n')
 }
 
 export function expectSecurityRulesSerialization(root : MatchNode, expected : string) {
-    expect('\n' + normalizeEmptyLines(stripIndent(serializeRulesAst(root))))
-            .toEqual(normalizeEmptyLines(stripIndent(expected)))
+    expect('\n' + normalizeWithSpace(stripIndent(serializeRulesAst(root))))
+            .toEqual(normalizeWithSpace(stripIndent(expected)))
 }
 
 describe('Security rules AST serialization', () => {

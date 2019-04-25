@@ -3,16 +3,29 @@ import * as some from 'lodash/some'
 import { StorageRegistry, CollectionDefinition } from "@worldbrain/storex";
 import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules } from "@worldbrain/storex-pattern-modules";
 import { MatchNode, AllowOperation } from "./ast";
+import serializeRuleLogic from './rule-logic';
 
 type BaseInfo = {}
 type ModuleInfo = BaseInfo & { moduleName : string, storageRegistry : StorageRegistry }
 type CollectionInfo = ModuleInfo & { collectionName : string, accessRules : AccessRules }
 
+type AllowStatementPartDesriptions = { [Part in keyof AccessRules | 'types'] : string }
+const ALLOW_STATEMENT_PART_DESCRIPTIONS : AllowStatementPartDesriptions = {
+    'types': 'Type checks',
+    'validation': 'Validation rules',
+    'ownership': 'Onwnership rules',
+    'permissions': 'Permission rules',
+    'constraints': 'Constraint rules',
+}
+type AllowStatementPart = keyof AllowStatementPartDesriptions
+
 const FIELD_TYPE_MAP = {
     boolean: 'bool',
     string: 'string',
+    text: 'string',
     int: 'number',
     float: 'float',
+    timestamp: 'timestamp',
 }
 
 const ACCESS_TYPE_MAP : { [Type in AccessType] : AllowOperation} = {
@@ -60,30 +73,42 @@ export function generateCollectionNode(collection : CollectionDefinition, option
 
     const accessTypes : AccessType[] = ['list', 'read', 'create', 'update', 'delete']
     for (const accessType of accessTypes) {
-        const expressions : string[] = []
-        if (accessType === 'create' || accessType === 'update' || accessType === 'delete') {
+        const expressions : { [RuleType in AllowStatementPart]? : string } = {}
+        if (accessType === 'read' || accessType === 'create' || accessType === 'update' || accessType === 'delete') {
             const ownershipCheck = generateOwnershipCheck(collection, { ...options, accessType })
             if (ownershipCheck) {
-                expressions.push(ownershipCheck)
+                expressions.ownership = ownershipCheck
             }
 
             const permissionChecks = generatePermissionChecks(collection, { ...options, accessType }).join(' && ')
             if (permissionChecks) {
-                expressions.push(permissionChecks)
+                expressions.permissions = permissionChecks
             }
         }
-        if (expressions.length && (accessType === 'create' || accessType === 'update')) {
-            const typeChecks = generateFieldTypeChecks(collection, options).join(' && ')
+        if (Object.keys(expressions).length && (accessType === 'create' || accessType === 'update')) {
+            const validationChecks = generateValidationChecks(collection, options).join(' && ')
+            if (validationChecks.length) {
+                expressions.validation = validationChecks
+            }
+
+            const typeChecks = generateFieldTypeChecks(collection, options).join(' &&\n  ')
             if (typeChecks.length) {
-                expressions.unshift(typeChecks)
+                expressions.types = typeChecks
             }
         }
 
-        if (expressions.length) {
+        if (Object.keys(expressions).length) {
             collectionNode.content.push({
                 type: 'allow',
                 operations: [ACCESS_TYPE_MAP[accessType]],
-                condition: expressions.join(' && ')
+                condition: Object.keys(ALLOW_STATEMENT_PART_DESCRIPTIONS).map(partKey => {
+                    const expression = expressions[partKey]
+                    if (!expression) {
+                        return ''
+                    }
+
+                    return `\n  // ${ALLOW_STATEMENT_PART_DESCRIPTIONS[partKey]}\n  ${expression}`
+                }).filter(part => !!part).join(' &&\n\n') + '\n'
             })
         }
     }
@@ -154,6 +179,19 @@ function generateOwnershipCheck(collection : CollectionDefinition, options : Col
     return `request.auth.uid === ${rhs}`
 }
 
+function generateValidationChecks(collection : CollectionDefinition, options : CollectionInfo) : string[] {
+    const validationRules = options.accessRules.validation || {}
+
+    const checks = []
+    for (const check of validationRules[options.collectionName] || []) {
+        checks.push(serializeRuleLogic(check.rule, { placeholders: {
+            'context.now': 'request.time',
+            'value': `resource.data.${check.field}`
+        } }))
+    }
+    return checks
+}
+
 function generatePermissionChecks(collection : CollectionDefinition, options : CollectionInfo & { accessType : AccessType }) : string[] {
     const permissionRules = options.accessRules.permissions && options.accessRules.permissions[options.collectionName]
     if (!permissionRules) {
@@ -165,7 +203,9 @@ function generatePermissionChecks(collection : CollectionDefinition, options : C
         return []
     }
 
-    return [accessTypeRule.rule as string]
+    return [serializeRuleLogic(accessTypeRule.rule, { placeholders: {
+        'context.now': 'request.time',
+    } })]
 }
 
 function isGroupKey(key : string, options : { collection : CollectionDefinition }) {

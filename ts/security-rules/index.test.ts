@@ -3,6 +3,7 @@ import { StorageModuleConfig, registerModuleMapCollections } from '@worldbrain/s
 import { StorageRegistry } from '@worldbrain/storex';
 import { generateRulesAstFromStorageModules } from '.';
 import { expectSecurityRulesSerialization } from './ast.test';
+import { SharedSyncLogStorage } from './test-cases/sync';
 
 describe('Firestore security rules generation', () => {
     type TestOptions = { modules : { [name : string] : StorageModuleConfig }, expected : string }
@@ -37,7 +38,7 @@ describe('Firestore security rules generation', () => {
                         accessRules: {
                             permissions: {
                                 foo: {
-                                    create: { rule: 'true' },
+                                    create: { rule: true },
                                 }
                             }
                         }
@@ -47,7 +48,16 @@ describe('Firestore security rules generation', () => {
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
-                            allow create: if resource.data.fieldBool is bool && resource.data.fieldString is string && resource.data.fieldInt is number && resource.data.fieldFloat is float && true;
+                            allow create: if
+                              // Type checks
+                              resource.data.fieldBool is bool &&
+                              resource.data.fieldString is string &&
+                              resource.data.fieldInt is number &&
+                              resource.data.fieldFloat is float &&
+                
+                              // Permission rules
+                              true
+                            ;
                         }
                     }
                 }`
@@ -70,7 +80,7 @@ describe('Firestore security rules generation', () => {
                         accessRules: {
                             permissions: {
                                 foo: {
-                                    create: { rule: 'true' },
+                                    create: { rule: true },
                                 }
                             }
                         }
@@ -80,7 +90,14 @@ describe('Firestore security rules generation', () => {
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
-                            allow create: if resource.data.fieldBool is bool && (!('fieldString' in request.resource.data.keys()) || resource.data.fieldString is string) && true;
+                            allow create: if
+                              // Type checks
+                              resource.data.fieldBool is bool &&
+                              (!('fieldString' in request.resource.data.keys()) || resource.data.fieldString is string) &&
+                
+                              // Permission rules
+                              true
+                            ;
                         }
                     }
                 }`
@@ -116,7 +133,14 @@ describe('Firestore security rules generation', () => {
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
-                            allow create: if resource.data.userId is string && resource.data.fieldBool is bool && request.auth.uid === resource.data.userId;
+                            allow create: if
+                              // Type checks
+                              resource.data.userId is string &&
+                              resource.data.fieldBool is bool &&
+                
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
                         }
                     }
                 }`
@@ -151,7 +175,13 @@ describe('Firestore security rules generation', () => {
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
-                            allow create: if resource.data.fieldBool is bool && request.auth.uid === userId;
+                            allow create: if
+                              // Type checks
+                              resource.data.fieldBool is bool &&
+                
+                              // Onwnership rules
+                              request.auth.uid === userId
+                            ;
                         }
                     }
                 }`
@@ -189,7 +219,160 @@ describe('Firestore security rules generation', () => {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
                             match /lists/{listId} {
-                                allow create: if resource.data.fieldBool is bool && request.auth.uid === userId;
+                                allow create: if
+                                  // Type checks
+                                  resource.data.fieldBool is bool &&
+                
+                                  // Onwnership rules
+                                  request.auth.uid === userId
+                                ;
+                            }
+                        }
+                    }
+                }`
+            })
+        })
+    })
+
+    describe('validation', () => {
+        it('should generate custom validation rules', async () => {
+            await runTest({
+                modules: {
+                    test: {
+                        collections: {
+                            foo: {
+                                version: new Date(),
+                                fields: {
+                                    updatedWhen: { type: 'timestamp', optional: true },
+                                    content: { type: 'text' },
+                                }
+                            },
+                        },
+                        accessRules: {
+                            permissions: {
+                                foo: {
+                                    create: {
+                                        rule: true,
+                                    },
+                                }
+                            },
+                            validation: {
+                                foo: [
+                                    {
+                                        field: 'updatedWhen',
+                                        rule: { or: [
+                                            { eq: ['$value', null] },
+                                            { eq: ['$value', '$context.now'] },
+                                        ] }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                },
+                expected: `
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /foo/{foo} {
+                            allow create: if
+                              // Type checks
+                              (!('updatedWhen' in request.resource.data.keys()) || resource.data.updatedWhen is timestamp) &&
+                              resource.data.content is string &&
+                
+                              // Validation rules
+                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                
+                              // Permission rules
+                              true
+                            ;
+                        }
+                    }
+                }`
+            })
+        })
+    })
+
+    describe('test cases', () => {
+        const modules = { sharedSyncLog: new SharedSyncLogStorage({ storageManager: null as any, autoPkType: 'string' }).getConfig() }
+
+        it('should correctly handle the sync test case', async () => {
+            await runTest({
+                modules,
+                expected: `
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /sharedSyncLogEntry/{sharedSyncLogEntry} {
+                            allow get: if
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                            allow create: if
+                              // Type checks
+                              resource.data.userId is string &&
+                              resource.data.deviceId is string &&
+                              resource.data.createdOn is timestamp &&
+                              resource.data.sharedOn is timestamp &&
+                              resource.data.data is string &&
+                
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                            allow delete: if
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                        }
+                        match /sharedSyncLogDeviceInfo/{sharedSyncLogDeviceInfo} {
+                            allow get: if
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                            allow create: if
+                              // Type checks
+                              resource.data.userId is string &&
+                              resource.data.sharedUntil is timestamp &&
+                
+                              // Validation rules
+                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                            allow update: if
+                              // Type checks
+                              resource.data.userId is string &&
+                              resource.data.sharedUntil is timestamp &&
+                
+                              // Validation rules
+                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                            allow delete: if
+                              // Onwnership rules
+                              request.auth.uid === resource.data.userId
+                            ;
+                        }
+                        match /sharedSyncLogSeenEntry/{creatorDeviceId} {
+                            match /entries/{sharedSyncLogSeenEntry} {
+                                allow get: if
+                                  // Onwnership rules
+                                  request.auth.uid === resource.data.userId
+                                ;
+                                allow create: if
+                                  // Type checks
+                                  resource.data.creatorId is string &&
+                                  resource.data.retrieverDeviceId is string &&
+                                  resource.data.createdOn is timestamp &&
+                
+                                  // Onwnership rules
+                                  request.auth.uid === resource.data.userId
+                                ;
+                                allow delete: if
+                                  // Onwnership rules
+                                  request.auth.uid === resource.data.userId
+                                ;
                             }
                         }
                     }
