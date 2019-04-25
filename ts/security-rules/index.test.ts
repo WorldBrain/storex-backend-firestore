@@ -30,8 +30,10 @@ describe('Firestore security rules generation', () => {
                                 fields: {
                                     fieldBool: { type: 'boolean' },
                                     fieldString: { type: 'string' },
+                                    fieldText: { type: 'text' },
                                     fieldInt: { type: 'int' },
                                     fieldFloat: { type: 'float' },
+                                    fieldTimestamp: { type: 'timestamp' },
                                 }
                             },
                         },
@@ -52,8 +54,10 @@ describe('Firestore security rules generation', () => {
                               // Type checks
                               resource.data.fieldBool is bool &&
                               resource.data.fieldString is string &&
+                              resource.data.fieldText is string &&
                               resource.data.fieldInt is number &&
                               resource.data.fieldFloat is float &&
+                              resource.data.fieldTimestamp is timestamp &&
                 
                               // Permission rules
                               true
