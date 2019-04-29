@@ -33,6 +33,7 @@ export function serializeRulesNode(node : Node) : string {
     }
 
     const exhaustiveGuard : never = node // If this errors, you forgot to handle a node type
+    throw new Error(`Unknown security rules AST node type encountered (will never happen)`)
 }
 
 export function serializeMatchNode(node : MatchNode) : string {

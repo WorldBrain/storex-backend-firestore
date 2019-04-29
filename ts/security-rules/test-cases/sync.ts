@@ -113,6 +113,7 @@ export function createSharedSyncLogConfig(options : {
                     sharedOn: { type: 'timestamp' }, // when was this entry uploaded
                     data: { type: 'string' },
                 },
+                groupBy: [{ key: 'userId', subcollectionName: 'entries' }],
             },
             sharedSyncLogDeviceInfo: {
                 version: new Date('2019-02-05'),
@@ -120,6 +121,7 @@ export function createSharedSyncLogConfig(options : {
                     userId: { type: options.autoPkType },
                     sharedUntil: { type: 'timestamp' },
                 },
+                groupBy: [{ key: 'userId', subcollectionName: 'devices' }],
             },
             ...(options.collections || {})
         },

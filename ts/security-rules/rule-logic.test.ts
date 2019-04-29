@@ -1,4 +1,4 @@
-import * as expect from 'expect'
+import expect from 'expect'
 import serializeRuleLogic from "./rule-logic";
 
 describe('Security rules logic serialization', () => {
@@ -9,6 +9,6 @@ describe('Security rules logic serialization', () => {
         ] }, { placeholders: {
             value: 'resource.data.updatedWhen',
             'context.now': 'request.time'
-        }})).toEqual('((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time))')
+        }})).toEqual('((resource.data.updatedWhen == null) || (resource.data.updatedWhen == request.time))')
     })
 })

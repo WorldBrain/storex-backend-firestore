@@ -5,8 +5,8 @@ type SerializationOptions = { placeholders : {[name : string] : string} }
 const BINARY_OPS : { [ Key in RuleLogicBinaryOpKey ] : string } = {
     or: '||',
     and: '&&',
-    eq: '===',
-    ne: '!==',
+    eq: '==',
+    ne: '!=',
     gt: '>',
     ge: '>=',
     lt: '<',
@@ -44,7 +44,7 @@ function serializeBinaryOp(op : RuleLogicBinaryOp, options : SerializationOption
 }
 
 function isBinaryOp(logic : RuleLogic) : logic is RuleLogicBinaryOp {
-    const keys = Object.keys(logic)
+    const keys = Object.keys(logic || {})
     return keys.length === 1 && !!BINARY_OPS[keys[0]]
 }
 

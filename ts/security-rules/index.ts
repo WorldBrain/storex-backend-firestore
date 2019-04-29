@@ -1,7 +1,8 @@
-import * as flatten from 'lodash/flatten'
-import * as some from 'lodash/some'
+import flatten from 'lodash/flatten'
+import some from 'lodash/some'
+import mapValues from 'lodash/mapValues'
 import { StorageRegistry, CollectionDefinition } from "@worldbrain/storex";
-import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules } from "@worldbrain/storex-pattern-modules";
+import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules, registerModuleMapCollections } from "@worldbrain/storex-pattern-modules";
 import { MatchNode, AllowOperation } from "./ast";
 import serializeRuleLogic from './rule-logic';
 
@@ -36,6 +37,18 @@ const ACCESS_TYPE_MAP : { [Type in AccessType] : AllowOperation} = {
     delete: 'delete',
 }
 
+export async function generateRulesAstFromStorageModuleConfigs(
+    modules : { [name : string] : StorageModuleConfig }
+) : Promise<MatchNode> {
+    const storageModules = mapValues(modules, config => ({ getConfig: () => config }))
+
+    const storageRegistry = new StorageRegistry()
+    registerModuleMapCollections(storageRegistry, storageModules)
+    await storageRegistry.finishInitialization()
+
+    return generateRulesAstFromStorageModules(storageModules, { storageRegistry })
+}
+
 export function generateRulesAstFromStorageModules(
     modules : { [name : string] : StorageModuleInterface },
     options : { storageRegistry : StorageRegistry }) : MatchNode
@@ -54,15 +67,16 @@ export function generateRulesAstFromStorageModules(
 }
 
 export function generateModuleNode(module : StorageModuleConfig, options : ModuleInfo ) : MatchNode[] {
-    if (!module.accessRules) {
+    const accessRules = module.accessRules
+    if (!accessRules || !module.collections) {
         return []
     }
 
     return Object.keys(module.collections)
         .map((collectionName) =>
-            generateCollectionNode(options.storageRegistry.collections[collectionName], { ...options, collectionName, accessRules: module.accessRules })
+            generateCollectionNode(options.storageRegistry.collections[collectionName], { ...options, collectionName, accessRules })
         )
-        .filter(node => !!node)
+        .filter(node => !!node) as MatchNode[]
 }
 
 export function generateCollectionNode(collection : CollectionDefinition, options : CollectionInfo ) : MatchNode | null {
@@ -153,7 +167,7 @@ function generateFieldTypeChecks(collection : CollectionDefinition, options : Co
             throw new Error(`Could not map type ${fieldConfig.type} of ${options.collectionName}.${fieldName} to Firestore type`)
         }
 
-        let check = `resource.data.${fieldName} is ${firestoreFieldType}`
+        let check = `request.resource.data.${fieldName} is ${firestoreFieldType}`
         if (fieldConfig.optional) {
             check = `(!('${fieldName}' in request.resource.data.keys()) || ${check})`
         }
@@ -175,8 +189,8 @@ function generateOwnershipCheck(collection : CollectionDefinition, options : Col
 
     const fieldIsPathParam = collection.pkIndex === ownershipRule.field
     const fieldIsGroupKey = isGroupKey(ownershipRule.field, { collection })
-    const rhs = fieldIsPathParam || fieldIsGroupKey ? ownershipRule.field : `resource.data.${ownershipRule.field}`
-    return `request.auth.uid === ${rhs}`
+    const rhs = fieldIsPathParam || fieldIsGroupKey ? ownershipRule.field : `request.resource.data.${ownershipRule.field}`
+    return `request.auth.uid == ${rhs}`
 }
 
 function generateValidationChecks(collection : CollectionDefinition, options : CollectionInfo) : string[] {
@@ -186,7 +200,7 @@ function generateValidationChecks(collection : CollectionDefinition, options : C
     for (const check of validationRules[options.collectionName] || []) {
         checks.push(serializeRuleLogic(check.rule, { placeholders: {
             'context.now': 'request.time',
-            'value': `resource.data.${check.field}`
+            'value': `request.resource.data.${check.field}`
         } }))
     }
     return checks

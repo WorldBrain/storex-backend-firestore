@@ -1,7 +1,7 @@
-import * as mapValues from 'lodash/mapValues'
+import mapValues from 'lodash/mapValues'
 import { StorageModuleConfig, registerModuleMapCollections } from '@worldbrain/storex-pattern-modules'
 import { StorageRegistry } from '@worldbrain/storex';
-import { generateRulesAstFromStorageModules } from '.';
+import { generateRulesAstFromStorageModules, generateRulesAstFromStorageModuleConfigs } from '.';
 import { expectSecurityRulesSerialization } from './ast.test';
 import { SharedSyncLogStorage } from './test-cases/sync';
 
@@ -9,13 +9,7 @@ describe('Firestore security rules generation', () => {
     type TestOptions = { modules : { [name : string] : StorageModuleConfig }, expected : string }
 
     async function runTest(options : TestOptions) {
-        const storageModules = mapValues(options.modules, config => ({ getConfig: () => config }))
-
-        const storageRegistry = new StorageRegistry()
-        registerModuleMapCollections(storageRegistry, storageModules)
-        await storageRegistry.finishInitialization()
-
-        const ast = generateRulesAstFromStorageModules(storageModules, { storageRegistry })
+        const ast = await generateRulesAstFromStorageModuleConfigs(options.modules)
         expectSecurityRulesSerialization(ast, options.expected)
     }
 
@@ -52,12 +46,12 @@ describe('Firestore security rules generation', () => {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              resource.data.fieldBool is bool &&
-                              resource.data.fieldString is string &&
-                              resource.data.fieldText is string &&
-                              resource.data.fieldInt is number &&
-                              resource.data.fieldFloat is float &&
-                              resource.data.fieldTimestamp is timestamp &&
+                              request.resource.data.fieldBool is bool &&
+                              request.resource.data.fieldString is string &&
+                              request.resource.data.fieldText is string &&
+                              request.resource.data.fieldInt is number &&
+                              request.resource.data.fieldFloat is float &&
+                              request.resource.data.fieldTimestamp is timestamp &&
                 
                               // Permission rules
                               true
@@ -96,8 +90,8 @@ describe('Firestore security rules generation', () => {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              resource.data.fieldBool is bool &&
-                              (!('fieldString' in request.resource.data.keys()) || resource.data.fieldString is string) &&
+                              request.resource.data.fieldBool is bool &&
+                              (!('fieldString' in request.resource.data.keys()) || request.resource.data.fieldString is string) &&
                 
                               // Permission rules
                               true
@@ -139,11 +133,11 @@ describe('Firestore security rules generation', () => {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              resource.data.userId is string &&
-                              resource.data.fieldBool is bool &&
+                              request.resource.data.userId is string &&
+                              request.resource.data.fieldBool is bool &&
                 
                               // Onwnership rules
-                              request.auth.uid === resource.data.userId
+                              request.auth.uid == request.resource.data.userId
                             ;
                         }
                     }
@@ -181,10 +175,10 @@ describe('Firestore security rules generation', () => {
                         match /foo/{userId} {
                             allow create: if
                               // Type checks
-                              resource.data.fieldBool is bool &&
+                              request.resource.data.fieldBool is bool &&
                 
                               // Onwnership rules
-                              request.auth.uid === userId
+                              request.auth.uid == userId
                             ;
                         }
                     }
@@ -225,10 +219,10 @@ describe('Firestore security rules generation', () => {
                             match /lists/{listId} {
                                 allow create: if
                                   // Type checks
-                                  resource.data.fieldBool is bool &&
+                                  request.resource.data.fieldBool is bool &&
                 
                                   // Onwnership rules
-                                  request.auth.uid === userId
+                                  request.auth.uid == userId
                                 ;
                             }
                         }
@@ -280,11 +274,11 @@ describe('Firestore security rules generation', () => {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              (!('updatedWhen' in request.resource.data.keys()) || resource.data.updatedWhen is timestamp) &&
-                              resource.data.content is string &&
+                              (!('updatedWhen' in request.resource.data.keys()) || request.resource.data.updatedWhen is timestamp) &&
+                              request.resource.data.content is string &&
                 
                               // Validation rules
-                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                              ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
                 
                               // Permission rules
                               true
@@ -305,77 +299,78 @@ describe('Firestore security rules generation', () => {
                 expected: `
                 service cloud.firestore {
                     match /databases/{database}/documents {
-                        match /sharedSyncLogEntry/{sharedSyncLogEntry} {
-                            allow get: if
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
-                            allow create: if
-                              // Type checks
-                              resource.data.userId is string &&
-                              resource.data.deviceId is string &&
-                              resource.data.createdOn is timestamp &&
-                              resource.data.sharedOn is timestamp &&
-                              resource.data.data is string &&
+                        match /sharedSyncLogEntry/{userId} {
+                            match /entries/{sharedSyncLogEntry} {
+                                allow get: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                                allow create: if
+                                  // Type checks
+                                  request.resource.data.deviceId is string &&
+                                  request.resource.data.createdOn is timestamp &&
+                                  request.resource.data.sharedOn is timestamp &&
+                                  request.resource.data.data is string &&
                 
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
-                            allow delete: if
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                                allow delete: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                            }
                         }
-                        match /sharedSyncLogDeviceInfo/{sharedSyncLogDeviceInfo} {
-                            allow get: if
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
-                            allow create: if
-                              // Type checks
-                              resource.data.userId is string &&
-                              resource.data.sharedUntil is timestamp &&
+                        match /sharedSyncLogDeviceInfo/{userId} {
+                            match /devices/{sharedSyncLogDeviceInfo} {
+                                allow get: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                                allow create: if
+                                  // Type checks
+                                  request.resource.data.sharedUntil is timestamp &&
                 
-                              // Validation rules
-                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                                  // Validation rules
+                                  ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
                 
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
-                            allow update: if
-                              // Type checks
-                              resource.data.userId is string &&
-                              resource.data.sharedUntil is timestamp &&
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                                allow update: if
+                                  // Type checks
+                                  request.resource.data.sharedUntil is timestamp &&
                 
-                              // Validation rules
-                              ((resource.data.updatedWhen === null) || (resource.data.updatedWhen === request.time)) &&
+                                  // Validation rules
+                                  ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
                 
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
-                            allow delete: if
-                              // Onwnership rules
-                              request.auth.uid === resource.data.userId
-                            ;
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                                allow delete: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
+                            }
                         }
                         match /sharedSyncLogSeenEntry/{creatorDeviceId} {
                             match /entries/{sharedSyncLogSeenEntry} {
                                 allow get: if
                                   // Onwnership rules
-                                  request.auth.uid === resource.data.userId
+                                  request.auth.uid == request.resource.data.userId
                                 ;
                                 allow create: if
                                   // Type checks
-                                  resource.data.creatorId is string &&
-                                  resource.data.retrieverDeviceId is string &&
-                                  resource.data.createdOn is timestamp &&
+                                  request.resource.data.creatorId is string &&
+                                  request.resource.data.retrieverDeviceId is string &&
+                                  request.resource.data.createdOn is timestamp &&
                 
                                   // Onwnership rules
-                                  request.auth.uid === resource.data.userId
+                                  request.auth.uid == request.resource.data.userId
                                 ;
                                 allow delete: if
                                   // Onwnership rules
-                                  request.auth.uid === resource.data.userId
+                                  request.auth.uid == request.resource.data.userId
                                 ;
                             }
                         }
