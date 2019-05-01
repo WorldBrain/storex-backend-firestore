@@ -17,67 +17,27 @@ export class SharedSyncLogStorage extends StorageModule {
                 sharedSyncLogSeenEntry: {
                     version: new Date('2019-02-05'),
                     fields: {
-                        creatorId: { type: this.autoPkType },
+                        userId: { type: this.autoPkType },
                         creatorDeviceId: { type: this.autoPkType },
                         retrieverDeviceId: { type: this.autoPkType },
                         createdOn: { type: 'timestamp' },
                     },
-                    groupBy: [{ key: 'creatorDeviceId', subcollectionName: 'entries' }],
+                    groupBy: [{ key: 'userId', subcollectionName: 'entries' }]
                 }
-            },
-            operations: {
-                createDeviceInfo: {
-                    operation: 'createObject',
-                    collection: 'sharedSyncLogDeviceInfo',
-                },
-                getDeviceInfo: {
-                    operation: 'findObject',
-                    collection: 'sharedSyncLogDeviceInfo',
-                    args: {id: '$deviceId'}
-                },
-                updateSharedUntil: {
-                    operation: 'updateObjects',
-                    collection: 'sharedSyncLogDeviceInfo',
-                    args: [{id: '$deviceId'}, {sharedUntil: '$sharedUntil:timestamp'}]
-                },
-                createLogEntry: {
-                    operation: 'createObject',
-                    collection: 'sharedSyncLogEntry',
-                },
-                findSyncEntries: {
-                    operation: 'findObjects',
-                    collection: 'sharedSyncLogEntry',
-                    args: [
-                        {
-                            userId: '$userId',
-                            sharedOn: {$gt: '$fromWhen:timestamp'},
-                        },
-                        {sort: ['sharedOn', 'asc']}
-                    ]
-                },
-                insertSeenEntries: {
-                    operation: 'executeBatch',
-                    args: ['$operations']
-                },
-                retrieveSeenEntries: {
-                    operation: 'findObjects',
-                    collection: 'sharedSyncLogSeenEntry',
-                    args: { retrieverDeviceId: '$deviceId' }
-                },
             },
             accessRules: {
                 ownership: {
                     sharedSyncLogDeviceInfo: {
                         field: 'userId',
-                        access: ['read', 'create', 'update', 'delete'],
+                        access: ['list', 'read', 'create', 'update', 'delete'],
                     },
                     sharedSyncLogEntry: {
                         field: 'userId',
-                        access: ['read', 'create', 'delete'],
+                        access: ['list', 'read', 'create', 'delete'],
                     },
                     sharedSyncLogSeenEntry: {
                         field: 'userId',
-                        access: ['read', 'create', 'delete'],
+                        access: ['list', 'read', 'create', 'delete'],
                     },
                 },
                 validation: {

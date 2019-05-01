@@ -301,6 +301,10 @@ describe('Firestore security rules generation', () => {
                     match /databases/{database}/documents {
                         match /sharedSyncLogEntry/{userId} {
                             match /entries/{sharedSyncLogEntry} {
+                                allow list: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
                                 allow get: if
                                   // Onwnership rules
                                   request.auth.uid == userId
@@ -323,6 +327,10 @@ describe('Firestore security rules generation', () => {
                         }
                         match /sharedSyncLogDeviceInfo/{userId} {
                             match /devices/{sharedSyncLogDeviceInfo} {
+                                allow list: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
                                 allow get: if
                                   // Onwnership rules
                                   request.auth.uid == userId
@@ -353,24 +361,28 @@ describe('Firestore security rules generation', () => {
                                 ;
                             }
                         }
-                        match /sharedSyncLogSeenEntry/{creatorDeviceId} {
+                        match /sharedSyncLogSeenEntry/{userId} {
                             match /entries/{sharedSyncLogSeenEntry} {
+                                allow list: if
+                                  // Onwnership rules
+                                  request.auth.uid == userId
+                                ;
                                 allow get: if
                                   // Onwnership rules
-                                  request.auth.uid == request.resource.data.userId
+                                  request.auth.uid == userId
                                 ;
                                 allow create: if
                                   // Type checks
-                                  request.resource.data.creatorId is string &&
+                                  request.resource.data.creatorDeviceId is string &&
                                   request.resource.data.retrieverDeviceId is string &&
                                   request.resource.data.createdOn is timestamp &&
                 
                                   // Onwnership rules
-                                  request.auth.uid == request.resource.data.userId
+                                  request.auth.uid == userId
                                 ;
                                 allow delete: if
                                   // Onwnership rules
-                                  request.auth.uid == request.resource.data.userId
+                                  request.auth.uid == userId
                                 ;
                             }
                         }

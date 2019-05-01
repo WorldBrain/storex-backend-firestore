@@ -88,7 +88,7 @@ export function generateCollectionNode(collection : CollectionDefinition, option
     const accessTypes : AccessType[] = ['list', 'read', 'create', 'update', 'delete']
     for (const accessType of accessTypes) {
         const expressions : { [RuleType in AllowStatementPart]? : string } = {}
-        if (accessType === 'read' || accessType === 'create' || accessType === 'update' || accessType === 'delete') {
+        if (accessType === 'list' || accessType === 'read' || accessType === 'create' || accessType === 'update' || accessType === 'delete') {
             const ownershipCheck = generateOwnershipCheck(collection, { ...options, accessType })
             if (ownershipCheck) {
                 expressions.ownership = ownershipCheck
@@ -189,8 +189,20 @@ function generateOwnershipCheck(collection : CollectionDefinition, options : Col
 
     const fieldIsPathParam = collection.pkIndex === ownershipRule.field
     const fieldIsGroupKey = isGroupKey(ownershipRule.field, { collection })
-    const rhs = fieldIsPathParam || fieldIsGroupKey ? ownershipRule.field : `request.resource.data.${ownershipRule.field}`
-    return `request.auth.uid == ${rhs}`
+
+    if (fieldIsPathParam || fieldIsGroupKey) {
+        return `request.auth.uid == ${ownershipRule.field}`
+    }
+
+    const fieldOnResource = `resource.data.${ownershipRule.field}`
+    
+    if (options.accessType === 'create') {
+        return `request.auth.uid == request.${fieldOnResource}`
+    } else if (options.accessType === 'update') {
+        return `request.auth.uid == ${fieldOnResource} && (request.auth.uid == request.${fieldOnResource} || (!('${ownershipRule.field}' in request.resource.data.keys()))`
+    } else {
+        return `request.auth.uid == ${fieldOnResource}`
+    }
 }
 
 function generateValidationChecks(collection : CollectionDefinition, options : CollectionInfo) : string[] {

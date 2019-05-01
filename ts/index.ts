@@ -48,6 +48,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
     }
 
     async findObjects<T>(collection : string, query : any, options : backend.FindManyOptions = {}) : Promise<Array<T>> {
+        query = { ...query }
+
         const collectionDefinition = this.registry.collections[collection]
         const pkIndex = collectionDefinition.pkIndex
 
@@ -71,7 +73,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
             return withPk
         }
 
-        const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query })
+        const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query, deleteGroupKeys: true })
         if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
             const result = await firestoreCollection.doc(query[pkIndex]).get()
             if (!result.exists) {
@@ -97,14 +99,18 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         }
     }
     
-    async updateObjects(collection : string, query : any, updates : any, options : backend.UpdateManyOptions) : Promise<backend.UpdateManyResult> {
+    async updateObjects(collection : string, where : any, updates : any, options : backend.UpdateManyOptions) : Promise<backend.UpdateManyResult> {
         const collectionDefinition = this.registry.collections[collection]
         const pkIndex = collectionDefinition.pkIndex
-        const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query })
-        if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
-            await firestoreCollection.doc(query[pkIndex]).update(updates)
+        
+        const origWhere = { ...where }
+        const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: where, deleteGroupKeys: true })
+        
+        if (Object.keys(where).length === 1 && typeof pkIndex === 'string' && where[pkIndex]) {
+            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { collectionDefinition }))
         } else {
-            const objects = await this.findObjects(collection, query)
+            const objects = await this.findObjects(collection, origWhere)
+            
             const batch = this.firestore.batch()
             for (const object of objects) {
                 batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { collectionDefinition }))
@@ -176,7 +182,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         return { info }
     }
 
-    async getFirestoreCollection(collection : string, options? : { forObject? : any, createGroupContainers? : boolean } ) {
+    async getFirestoreCollection(collection : string, options? : { forObject? : any, createGroupContainers? : boolean, deleteGroupKeys? : boolean } ) {
         const collectionDefiniton = this.registry.collections[collection]
         
         let firestoreCollection = this.rootRef ? this.rootRef.collection(collection) : this.firestore.collection(collection)
@@ -187,7 +193,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 //     containerDoc.set({})
                 // }
                 firestoreCollection = containerDoc.collection(group.subcollectionName)
-                // delete options.forObject[group.key]
+                if (options.deleteGroupKeys) {
+                    delete options.forObject[group.key]
+                }
             }
         }
 

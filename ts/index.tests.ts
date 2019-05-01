@@ -8,10 +8,14 @@ import { FirestoreStorageBackend } from '.';
 
 export async function withEmulatedFirestoreBackend<Modules extends {[name : string] : StorageModule} = {[name : string] : StorageModule}>(
     moduleCreators : { [name : string] : (options : { storageManager : StorageManager }) => StorageModule },
-    options : { auth? : { userId? : string } | true } = {},
+    options : { auth? : { userId? : string } | true, printProjectId? : boolean } = {},
     body : (options : { storageManager : StorageManager, modules : Modules, auth : { userId : string | null } }) => Promise<void>
 ) {
-    const projectId = "unit-test"
+    const projectId = `unit-test-${Date.now()}`
+    if (options.printProjectId) {
+        console.log(`Creating Firebase emulator project: ${projectId}`)
+    }
+
     const userId : string | null = options.auth ? ((options.auth as { userId? : string }).userId || 'alice') : null
     const firebaseApp = firebase.initializeTestApp({
         projectId: projectId,
