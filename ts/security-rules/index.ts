@@ -126,6 +126,9 @@ export function generateCollectionNode(collection : CollectionDefinition, option
             })
         }
     }
+    if (!rootNode.content.length) {
+        return null
+    }
 
     return rootNode
 }
