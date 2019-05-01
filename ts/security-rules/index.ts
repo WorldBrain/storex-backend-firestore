@@ -126,7 +126,7 @@ export function generateCollectionNode(collection : CollectionDefinition, option
             })
         }
     }
-    if (!rootNode.content.length) {
+    if (!rootNode.content.length || !collectionNode.content.length) {
         return null
     }
 

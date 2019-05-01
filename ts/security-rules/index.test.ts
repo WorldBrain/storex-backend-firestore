@@ -439,4 +439,55 @@ describe('Firestore security rules generation', () => {
             }`
         })
     })
+
+    it('should ignore collections without rules', async () => {
+        await runTest({
+            modules: {
+                test: {
+                    collections: {
+                        foo: {
+                            version: new Date(),
+                            fields: {
+                                userId: { type: 'string' },
+                                fieldBool: { type: 'boolean' },
+                            }
+                        },
+                        bar: {
+                            version: new Date(),
+                            fields: {
+                                userId: { type: 'string' },
+                                fieldBool: { type: 'boolean' },
+                            },
+                            groupBy: [
+                                { key: 'userId', subcollectionName: 'bars' }
+                            ]
+                        },
+                    },
+                    accessRules: {
+                        ownership: {
+                            foo: {
+                                field: 'userId',
+                                access: ['create']
+                            }
+                        }
+                    }
+                },
+            },
+            expected: `
+            service cloud.firestore {
+                match /databases/{database}/documents {
+                    match /foo/{foo} {
+                        allow create: if
+                          // Type checks
+                          request.resource.data.userId is string &&
+                          request.resource.data.fieldBool is bool &&
+            
+                          // Onwnership rules
+                          request.auth.uid == request.resource.data.userId
+                        ;
+                    }
+                }
+            }`
+        })
+    })
 })
