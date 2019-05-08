@@ -11,6 +11,7 @@ const BINARY_OPS : { [ Key in RuleLogicBinaryOpKey ] : string } = {
     ge: '>=',
     lt: '<',
     le: '<=',
+    has: 'in',
 }
 
 export default function serializeRuleLogic(logic : RuleLogic, options : SerializationOptions) : string {
@@ -33,8 +34,12 @@ function serializeValue(value : RuleLogicValue, options : SerializationOptions) 
 
 function serializeBinaryOp(op : RuleLogicBinaryOp, options : SerializationOptions) : string {
     const operatorKey = Object.keys(op)[0]
-    const operator = BINARY_OPS[operatorKey]
     const operands = op[operatorKey] as RuleLogic[]
+    if (operatorKey === 'has') {
+        return `(${serializeRuleLogic(operands[1], options)} in (${serializeRuleLogic(operands[0], options)}).keys())`
+    }
+
+    const operator = BINARY_OPS[operatorKey]
     if (operands.length !== 2) {
         throw new Error(`Detected access rule '${operatorKey}' expression with invalid number of operands: ${JSON.stringify(operands)}`)
     }

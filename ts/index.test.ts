@@ -31,7 +31,7 @@ describe('FirestoreStorageBackend', () => {
         const firebaseApp = firebase.initializeTestApp({
             projectId: `unit-test-${Date.now()}`,
         })
-        return new FirestoreStorageBackend({firestore: firebaseApp.firestore()})
+        return new FirestoreStorageBackend({ firebase: firebase as any, firestore: firebaseApp.firestore()})
     }
 
     // before(async () => {

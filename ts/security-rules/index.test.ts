@@ -136,7 +136,7 @@ describe('Firestore security rules generation', () => {
                               request.resource.data.userId is string &&
                               request.resource.data.fieldBool is bool &&
                 
-                              // Onwnership rules
+                              // Ownership rules
                               request.auth.uid == request.resource.data.userId
                             ;
                         }
@@ -177,7 +177,7 @@ describe('Firestore security rules generation', () => {
                               // Type checks
                               request.resource.data.fieldBool is bool &&
                 
-                              // Onwnership rules
+                              // Ownership rules
                               request.auth.uid == userId
                             ;
                         }
@@ -221,7 +221,7 @@ describe('Firestore security rules generation', () => {
                                   // Type checks
                                   request.resource.data.fieldBool is bool &&
                 
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                             }
@@ -258,10 +258,7 @@ describe('Firestore security rules generation', () => {
                                 foo: [
                                     {
                                         field: 'updatedWhen',
-                                        rule: { or: [
-                                            { eq: ['$value', null] },
-                                            { eq: ['$value', '$context.now'] },
-                                        ] }
+                                        rule: { eq: ['$value', '$context.now'] }
                                     }
                                 ]
                             }
@@ -278,7 +275,7 @@ describe('Firestore security rules generation', () => {
                               request.resource.data.content is string &&
                 
                               // Validation rules
-                              ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
+                              ((!('updatedWhen' in request.resource.data)) || (request.resource.data.updatedWhen == request.time)) &&
                 
                               // Permission rules
                               true
@@ -302,11 +299,11 @@ describe('Firestore security rules generation', () => {
                         match /sharedSyncLogEntry/{userId} {
                             match /entries/{sharedSyncLogEntry} {
                                 allow list: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow get: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow create: if
@@ -316,11 +313,11 @@ describe('Firestore security rules generation', () => {
                                   request.resource.data.sharedOn is timestamp &&
                                   request.resource.data.data is string &&
                 
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow delete: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                             }
@@ -328,11 +325,11 @@ describe('Firestore security rules generation', () => {
                         match /sharedSyncLogDeviceInfo/{userId} {
                             match /devices/{sharedSyncLogDeviceInfo} {
                                 allow list: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow get: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow create: if
@@ -340,9 +337,9 @@ describe('Firestore security rules generation', () => {
                                   request.resource.data.sharedUntil is timestamp &&
                 
                                   // Validation rules
-                                  ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
+                                  (request.resource.data.sharedUntil == request.time) &&
                 
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow update: if
@@ -350,13 +347,13 @@ describe('Firestore security rules generation', () => {
                                   request.resource.data.sharedUntil is timestamp &&
                 
                                   // Validation rules
-                                  ((request.resource.data.updatedWhen == null) || (request.resource.data.updatedWhen == request.time)) &&
+                                  (request.resource.data.sharedUntil == request.time) &&
                 
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow delete: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                             }
@@ -364,11 +361,11 @@ describe('Firestore security rules generation', () => {
                         match /sharedSyncLogSeenEntry/{userId} {
                             match /entries/{sharedSyncLogSeenEntry} {
                                 allow list: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow get: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow create: if
@@ -377,11 +374,11 @@ describe('Firestore security rules generation', () => {
                                   request.resource.data.retrieverDeviceId is string &&
                                   request.resource.data.createdOn is timestamp &&
                 
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                                 allow delete: if
-                                  // Onwnership rules
+                                  // Ownership rules
                                   request.auth.uid == userId
                                 ;
                             }
@@ -431,7 +428,7 @@ describe('Firestore security rules generation', () => {
                           request.resource.data.userId is string &&
                           request.resource.data.fieldBool is bool &&
             
-                          // Onwnership rules
+                          // Ownership rules
                           request.auth.uid == request.resource.data.userId
                         ;
                     }
@@ -482,7 +479,7 @@ describe('Firestore security rules generation', () => {
                           request.resource.data.userId is string &&
                           request.resource.data.fieldBool is bool &&
             
-                          // Onwnership rules
+                          // Ownership rules
                           request.auth.uid == request.resource.data.userId
                         ;
                     }

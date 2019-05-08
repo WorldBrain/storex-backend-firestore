@@ -26,7 +26,7 @@ export async function withEmulatedFirestoreBackend<Modules extends {[name : stri
         const firestore = firebaseApp.firestore()
 
         const { modules, storageManager } = await setupStorexTest<Modules>({
-            backend: new FirestoreStorageBackend({ firestore }) as any,
+            backend: new FirestoreStorageBackend({ firebase: firebase as any , firestore }) as any,
             modules: moduleCreators,
         })
 

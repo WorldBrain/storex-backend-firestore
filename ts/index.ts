@@ -1,4 +1,4 @@
-import * as firebase from 'firebase'
+import * as firebaseModule from 'firebase'
 import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, setIn } from '@worldbrain/storex/lib/utils'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
@@ -8,6 +8,7 @@ enum FieldProccessingReason {
     isTimestamp = 1,
     isGroupKey,
     isPrimaryKey,
+    isOptional,
 }
 
 const WHERE_OPERATORS = {
@@ -23,12 +24,14 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         executeBatch: true,
         collectionGrouping: true,
     }
+    firebase : typeof firebaseModule
     firestore : firebase.firestore.Firestore
     rootRef? : firebase.firestore.DocumentReference
 
-    constructor({firestore : firestoreObject, rootRef} : {firestore : firebase.firestore.Firestore, rootRef? : firebase.firestore.DocumentReference}) {
+    constructor({firebase, firestore : firestoreObject, rootRef} : {firebase : typeof firebaseModule, firestore : firebase.firestore.Firestore, rootRef? : firebase.firestore.DocumentReference}) {
         super()
 
+        this.firebase = firebase
         this.firestore = firestoreObject
         this.rootRef = rootRef
     }
@@ -107,13 +110,13 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: where, deleteGroupKeys: true })
         
         if (Object.keys(where).length === 1 && typeof pkIndex === 'string' && where[pkIndex]) {
-            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { collectionDefinition }))
+            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { firebase: this.firebase, collectionDefinition }))
         } else {
             const objects = await this.findObjects(collection, origWhere)
             
             const batch = this.firestore.batch()
             for (const object of objects) {
-                batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { collectionDefinition }))
+                batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { firebase: this.firebase, collectionDefinition }))
             }
             await batch.commit()
         }
@@ -164,7 +167,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     delete toInsert[collectionDefinition.pkIndex as string]
                 }
 
-                const preparedDoc = _prepareObjectForWrite(operation.args, { collectionDefinition })
+                const preparedDoc = _prepareObjectForWrite(toInsert, { firebase: this.firebase, collectionDefinition })
                 batch.set(docRef, preparedDoc)
 
                 if (operation.placeholder) {
@@ -230,7 +233,7 @@ export function _parseQueryWhere(where : any) : Array<{field : string, operator 
     return parsed
 }
 
-export function _prepareObjectForWrite(object : any, options : { collectionDefinition : CollectionDefinition }) : any {
+export function _prepareObjectForWrite(object : any, options : { firebase : typeof firebaseModule, collectionDefinition : CollectionDefinition }) : any {
     const fieldsToProcess = _getCollectionFielsToProcess(options.collectionDefinition)
     if (!fieldsToProcess.length) {
         return object
@@ -240,16 +243,26 @@ export function _prepareObjectForWrite(object : any, options : { collectionDefin
     for (const { fieldName, reason } of fieldsToProcess) {
         if (reason === FieldProccessingReason.isTimestamp) {
             if (object[fieldName] === '$now') {
-                object[fieldName] = firebase.firestore.FieldValue.serverTimestamp()
+                object[fieldName] = options.firebase.firestore.FieldValue.serverTimestamp()
             } else {
                 const value = object[fieldName]
+                if (typeof value === 'undefined' || value === null) {
+                    continue
+                }
                 if (typeof value !== 'number') {
                     throw new Error(`Invalid timestamp provided for ${options.collectionDefinition.name}.${fieldName} in attempted Firestore write`)
                 }
-                object[fieldName] = firebase.firestore.Timestamp.fromMillis(value)
+                object[fieldName] = options.firebase.firestore.Timestamp.fromMillis(value)
             }
         } else if (reason === FieldProccessingReason.isGroupKey) {
             delete object[fieldName]
+        } else if (reason === FieldProccessingReason.isOptional) {
+            const value = object[fieldName]
+            console.log(`Processing optional field ${fieldName}`, value)
+            if (value === null) {
+                console.log(`Deleting field ${fieldName}`)
+                delete object[fieldName]
+            }
         }
     }
 
@@ -284,6 +297,10 @@ export function _getCollectionFielsToProcess(collectionDefinition : CollectionDe
         }
         if (reason) {
             fieldsToProcess.push({ fieldName, reason })
+        }
+
+        if (fieldConfig.optional) {
+            fieldsToProcess.push({ fieldName, reason: FieldProccessingReason.isOptional })
         }
     }
     return fieldsToProcess

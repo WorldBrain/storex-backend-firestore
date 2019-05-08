@@ -11,4 +11,12 @@ describe('Security rules logic serialization', () => {
             'context.now': 'request.time'
         }})).toEqual('((resource.data.updatedWhen == null) || (resource.data.updatedWhen == request.time))')
     })
+
+    it('should serialize "has" operations', () => {
+        expect(serializeRuleLogic({ has: [
+            '$value', 'key'
+        ] }, { placeholders: {
+            value: 'request.resource.data',
+        }})).toEqual(`("key" in (request.resource.data).keys())`)
+    })
 })

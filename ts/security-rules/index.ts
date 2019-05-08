@@ -14,7 +14,7 @@ type AllowStatementPartDesriptions = { [Part in keyof AccessRules | 'types'] : s
 const ALLOW_STATEMENT_PART_DESCRIPTIONS : AllowStatementPartDesriptions = {
     'types': 'Type checks',
     'validation': 'Validation rules',
-    'ownership': 'Onwnership rules',
+    'ownership': 'Ownership rules',
     'permissions': 'Permission rules',
     'constraints': 'Constraint rules',
 }
@@ -213,10 +213,15 @@ function generateValidationChecks(collection : CollectionDefinition, options : C
 
     const checks = []
     for (const check of validationRules[options.collectionName] || []) {
-        checks.push(serializeRuleLogic(check.rule, { placeholders: {
+        let expression = serializeRuleLogic(check.rule, { placeholders: {
             'context.now': 'request.time',
-            'value': `request.resource.data.${check.field}`
-        } }))
+            'value': `request.resource.data.${check.field}`,
+        } })
+        if (collection.fields[check.field].optional) {
+            expression = `((!('${check.field}' in request.resource.data)) || ${expression})`
+        }
+
+        checks.push(expression)
     }
     return checks
 }

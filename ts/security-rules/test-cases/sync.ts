@@ -43,11 +43,8 @@ export class SharedSyncLogStorage extends StorageModule {
                 validation: {
                     sharedSyncLogDeviceInfo: [
                         {
-                            field: 'updatedWhen',
-                            rule: { or: [
-                                { eq: ['$value', null] },
-                                { eq: ['$value', '$context.now'] },
-                            ] }
+                            field: 'sharedUntil',
+                            rule: { eq: ['$value', '$context.now'] }
                         }
                     ]
                 },
