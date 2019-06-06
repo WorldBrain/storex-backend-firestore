@@ -112,7 +112,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         if (Object.keys(where).length === 1 && typeof pkIndex === 'string' && where[pkIndex]) {
             await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { firebase: this.firebase, collectionDefinition }))
         } else {
-            const objects = await this.findObjects(collection, origWhere)
+            const objects = await this.findObjects<any>(collection, origWhere)
             
             const batch = this.firestore.batch()
             for (const object of objects) {
@@ -211,7 +211,7 @@ export function _parseQueryWhere(where : any) : Array<{field : string, operator 
     for (const [field, operatorAndValue] of Object.entries(where)) {
         let valueEntries = null
         try {
-            valueEntries = Object.entries(operatorAndValue)
+            valueEntries = Object.entries(operatorAndValue as any)
         } catch (e) {
             if (!(e instanceof TypeError)) {
                 throw e
