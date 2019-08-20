@@ -50,6 +50,34 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         return { object }
     }
 
+    async rawCreateObjects(collection : string, objects : any, options : backend.CreateManyOptions) : Promise<backend.CreateManyResult> {
+        const batch = this.firestore.batch()
+        const results = []
+
+        const collectionDefinition = this.registry.collections[collection]
+        let firestoreCollection = await this.getFirestoreCollection(collection, {
+            createGroupContainers: true,
+        })
+
+        for (const object of objects) {
+            let docRef : firebase.firestore.DocumentReference
+            if (collectionDefinition.fields[collectionDefinition.pkIndex as string].type === 'auto-pk') {
+                docRef = firestoreCollection.doc()
+            } else {
+                docRef = firestoreCollection.doc(object[collectionDefinition.pkIndex as string])
+                delete object[collectionDefinition.pkIndex as string]
+            }
+
+            const preparedDoc = _prepareObjectForWrite(object, { firebase: this.firebase, collectionDefinition })
+            batch.set(docRef, preparedDoc)
+
+            results.push({pkIndex: docRef, ...preparedDoc})
+        }
+        await batch.commit()
+
+        return { "objects": results }
+    }
+
     async findObjects<T>(collection : string, query : any, options : backend.FindManyOptions = {}) : Promise<Array<T>> {
         query = { ...query }
 
