@@ -4,3 +4,4 @@ test.dot
 private
 yarn.lock
 yarn-error.log
+fire*.log
