@@ -15,7 +15,7 @@ const WHERE_OPERATORS = {
     '$eq': '==',
     '$lt': '<',
     '$lte': '<=',
-    '$gt': '>=',
+    '$gt': '>',
     '$gte': '>=',
 }
 
@@ -86,7 +86,11 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
             return [_prepareObjectForRead(addKeys(object, query[pkIndex]), { collectionDefinition })]
         } else {
             let q : firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
-            for (const {field, operator, value} of _parseQueryWhere(query)) {
+            for (let {field, operator, value} of _parseQueryWhere(query)) {
+                if (collectionDefinition.fields[field].type === 'timestamp') {
+                    value = new Date(value)
+                }
+                console.log(field, WHERE_OPERATORS[operator], value)
                 q = q.where(field, WHERE_OPERATORS[operator], value)
             }
             for (const [field, order] of options.order || []) {
@@ -258,9 +262,7 @@ export function _prepareObjectForWrite(object : any, options : { firebase : type
             delete object[fieldName]
         } else if (reason === FieldProccessingReason.isOptional) {
             const value = object[fieldName]
-            console.log(`Processing optional field ${fieldName}`, value)
             if (value === null) {
-                console.log(`Deleting field ${fieldName}`)
                 delete object[fieldName]
             }
         }
