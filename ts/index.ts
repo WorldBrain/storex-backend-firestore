@@ -54,6 +54,10 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         query = { ...query }
 
         const collectionDefinition = this.registry.collections[collection]
+        if (!collectionDefinition) {
+            throw new Error(`Unknown collection: ${collection}`)
+        }
+
         const pkIndex = collectionDefinition.pkIndex
 
         const pairsToInclude = (collectionDefinition.groupBy || []).map(

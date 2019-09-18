@@ -8,7 +8,7 @@ import { FirestoreStorageBackend } from '.';
 
 export async function withEmulatedFirestoreBackend<Modules extends {[name : string] : StorageModule} = {[name : string] : StorageModule}>(
     moduleCreators : { [name : string] : (options : { storageManager : StorageManager }) => StorageModule },
-    options : { auth? : { userId? : string } | true, printProjectId? : boolean } = {},
+    options : { auth? : { userId? : string } | true, printProjectId? : boolean, loadRules?: boolean } = {},
     body : (options : { storageManager : StorageManager, modules : Modules, auth : { userId : string | null } }) => Promise<void>
 ) {
     const projectId = `unit-test-${Date.now()}`
@@ -30,9 +30,11 @@ export async function withEmulatedFirestoreBackend<Modules extends {[name : stri
             modules: moduleCreators,
         })
 
-        const ast = await generateRulesAstFromStorageModules(modules, { storageRegistry: storageManager.registry })
-        const rules = serializeRulesAST(ast)
-        await loadRules({ projectId, rules })
+        if (options.loadRules !== false) {
+            const ast = await generateRulesAstFromStorageModules(modules, { storageRegistry: storageManager.registry })
+            const rules = serializeRulesAST(ast)
+            await loadRules({ projectId, rules })
+        }
 
         await body({ storageManager, modules, auth: { userId } })
     } finally {
