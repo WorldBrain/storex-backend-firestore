@@ -6,17 +6,17 @@ import { generateRulesAstFromStorageModules } from './security-rules';
 import { serializeRulesAST } from './security-rules/ast';
 import { FirestoreStorageBackend } from '.';
 
-export async function withEmulatedFirestoreBackend<Modules extends {[name : string] : StorageModule} = {[name : string] : StorageModule}>(
-    moduleCreators : { [name : string] : (options : { storageManager : StorageManager }) => StorageModule },
-    options : { auth? : { userId? : string } | true, printProjectId? : boolean, loadRules?: boolean } = {},
-    body : (options : { storageManager : StorageManager, modules : Modules, auth : { userId : string | null } }) => Promise<void>
+export async function withEmulatedFirestoreBackend<Modules extends { [name: string]: StorageModule } = { [name: string]: StorageModule }>(
+    moduleCreators: { [name: string]: (options: { storageManager: StorageManager }) => StorageModule },
+    options: { auth?: { userId?: string } | true, printProjectId?: boolean, loadRules?: boolean } = {},
+    body: (options: { storageManager: StorageManager, modules: Modules, auth: { userId: string | null } }) => Promise<void>
 ) {
     const projectId = `unit-test-${Date.now()}`
     if (options.printProjectId) {
         console.log(`Creating Firebase emulator project: ${projectId}`)
     }
 
-    const userId : string | null = options.auth ? ((options.auth as { userId? : string }).userId || 'alice') : null
+    const userId: string | null = options.auth ? ((options.auth as { userId?: string }).userId || 'alice') : null
     const firebaseApp = firebase.initializeTestApp({
         projectId: projectId,
         auth: userId ? { uid: userId } : {}
@@ -26,7 +26,7 @@ export async function withEmulatedFirestoreBackend<Modules extends {[name : stri
         const firestore = firebaseApp.firestore()
 
         const { modules, storageManager } = await setupStorexTest<Modules>({
-            backend: new FirestoreStorageBackend({ firebase: firebase as any , firestore }) as any,
+            backend: new FirestoreStorageBackend({ firebase: firebase as any, firestore: firestore as any }) as any,
             modules: moduleCreators,
         })
 
@@ -42,7 +42,7 @@ export async function withEmulatedFirestoreBackend<Modules extends {[name : stri
     }
 }
 
-const loadRules : typeof firebase.loadFirestoreRules = async (options) => {
+const loadRules: typeof firebase.loadFirestoreRules = async (options) => {
     try {
         await firebase.loadFirestoreRules(options)
     } catch (e) {
