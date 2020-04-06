@@ -6,12 +6,12 @@ import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules, r
 import { MatchNode, AllowOperation } from "./ast";
 import serializeRuleLogic from './rule-logic';
 
-type BaseInfo = {}
-type ModuleInfo = BaseInfo & { moduleName : string, storageRegistry : StorageRegistry }
-type CollectionInfo = ModuleInfo & { collectionName : string, accessRules : AccessRules }
+type BaseInfo = { excludeTypeChecks?: boolean }
+type ModuleInfo = BaseInfo & { moduleName: string, storageRegistry: StorageRegistry }
+type CollectionInfo = ModuleInfo & { collectionName: string, accessRules: AccessRules }
 
-type AllowStatementPartDesriptions = { [Part in keyof AccessRules | 'types'] : string }
-const ALLOW_STATEMENT_PART_DESCRIPTIONS : AllowStatementPartDesriptions = {
+type AllowStatementPartDesriptions = { [Part in keyof AccessRules | 'types']: string }
+const ALLOW_STATEMENT_PART_DESCRIPTIONS: AllowStatementPartDesriptions = {
     'types': 'Type checks',
     'validation': 'Validation rules',
     'ownership': 'Ownership rules',
@@ -29,7 +29,7 @@ const FIELD_TYPE_MAP = {
     timestamp: 'timestamp',
 }
 
-const ACCESS_TYPE_MAP : { [Type in AccessType] : AllowOperation} = {
+const ACCESS_TYPE_MAP: { [Type in AccessType]: AllowOperation } = {
     list: 'list',
     read: 'get',
     create: 'create',
@@ -38,27 +38,27 @@ const ACCESS_TYPE_MAP : { [Type in AccessType] : AllowOperation} = {
 }
 
 export async function generateRulesAstFromStorageModuleConfigs(
-    modules : { [name : string] : StorageModuleConfig }
-) : Promise<MatchNode> {
-    const storageModules = mapValues(modules, config => ({ getConfig: () => config }))
+    modules: { [name: string]: StorageModuleConfig },
+    options?: BaseInfo
+): Promise<MatchNode> {
+    const storageModules = mapValues(modules, (config) => ({ getConfig: () => config }))
 
     const storageRegistry = new StorageRegistry()
     registerModuleMapCollections(storageRegistry, storageModules)
     await storageRegistry.finishInitialization()
 
-    return generateRulesAstFromStorageModules(storageModules, { storageRegistry })
+    return generateRulesAstFromStorageModules(storageModules, { storageRegistry, ...(options || {}) })
 }
 
 export function generateRulesAstFromStorageModules(
-    modules : { [name : string] : StorageModuleInterface },
-    options : { storageRegistry : StorageRegistry }) : MatchNode
-{
+    modules: { [name: string]: StorageModuleInterface },
+    options: BaseInfo & { storageRegistry: StorageRegistry }): MatchNode {
     const moduleNodes = flatten(Object.entries(modules).map(([moduleName, module]) => generateModuleNode(module.getConfig(), {
         ...options,
         moduleName
     })))
 
-    const rootNode : MatchNode = {
+    const rootNode: MatchNode = {
         type: 'match',
         path: '/databases/{database}/documents',
         content: moduleNodes
@@ -66,7 +66,7 @@ export function generateRulesAstFromStorageModules(
     return rootNode
 }
 
-export function generateModuleNode(module : StorageModuleConfig, options : ModuleInfo ) : MatchNode[] {
+export function generateModuleNode(module: StorageModuleConfig, options: ModuleInfo): MatchNode[] {
     const accessRules = module.accessRules
     if (!accessRules || !module.collections) {
         return []
@@ -79,15 +79,15 @@ export function generateModuleNode(module : StorageModuleConfig, options : Modul
         .filter(node => !!node) as MatchNode[]
 }
 
-export function generateCollectionNode(collection : CollectionDefinition, options : CollectionInfo ) : MatchNode | null {
+export function generateCollectionNode(collection: CollectionDefinition, options: CollectionInfo): MatchNode | null {
     const pkField = collection.fields[collection.pkIndex as string]
     const pkKey = pkField.type !== 'auto-pk' ? collection.pkIndex as string : options.collectionName
 
     const { root: rootNode, inner: collectionNode } = makeEmptyCollectionNode(collection, { ...options, pkKey })
 
-    const accessTypes : AccessType[] = ['list', 'read', 'create', 'update', 'delete']
+    const accessTypes: AccessType[] = ['list', 'read', 'create', 'update', 'delete']
     for (const accessType of accessTypes) {
-        const expressions : { [RuleType in AllowStatementPart]? : string } = {}
+        const expressions: { [RuleType in AllowStatementPart]?: string } = {}
         if (accessType === 'list' || accessType === 'read' || accessType === 'create' || accessType === 'update' || accessType === 'delete') {
             const ownershipCheck = generateOwnershipCheck(collection, { ...options, accessType })
             if (ownershipCheck) {
@@ -106,7 +106,7 @@ export function generateCollectionNode(collection : CollectionDefinition, option
             }
 
             const typeChecks = generateFieldTypeChecks(collection, options).join(' &&\n  ')
-            if (typeChecks.length) {
+            if ((!options.excludeTypeChecks) && typeChecks.length) {
                 expressions.types = typeChecks
             }
         }
@@ -133,17 +133,17 @@ export function generateCollectionNode(collection : CollectionDefinition, option
     return rootNode
 }
 
-function makeEmptyCollectionNode(collection : CollectionDefinition, options: CollectionInfo & { pkKey : string }): { root: MatchNode, inner: MatchNode } {
+function makeEmptyCollectionNode(collection: CollectionDefinition, options: CollectionInfo & { pkKey: string }): { root: MatchNode, inner: MatchNode } {
     const groupKeys = (collection.groupBy || []).map(group => group.key)
     const keys = [...groupKeys, options.pkKey]
-    let inner : MatchNode = {
+    let inner: MatchNode = {
         type: 'match',
         path: `/${options.collectionName}/{${keys.shift()}}`,
         content: []
     }
     const root = inner
     for (const group of collection.groupBy || []) {
-        const childNode : MatchNode = {
+        const childNode: MatchNode = {
             type: 'match',
             path: `/${group.subcollectionName}/{${keys.shift()}}`,
             content: []
@@ -154,8 +154,8 @@ function makeEmptyCollectionNode(collection : CollectionDefinition, options: Col
     return { root, inner }
 }
 
-function generateFieldTypeChecks(collection : CollectionDefinition, options : CollectionInfo) : string[] {
-    const checks : string[] = []
+function generateFieldTypeChecks(collection: CollectionDefinition, options: CollectionInfo): string[] {
+    const checks: string[] = []
     for (const [fieldName, fieldConfig] of Object.entries(collection.fields)) {
         if (fieldConfig.type === 'auto-pk' || fieldName === collection.pkIndex) {
             continue
@@ -179,7 +179,7 @@ function generateFieldTypeChecks(collection : CollectionDefinition, options : Co
     return checks
 }
 
-function generateOwnershipCheck(collection : CollectionDefinition, options : CollectionInfo & { accessType : AccessType }) : string | null {
+function generateOwnershipCheck(collection: CollectionDefinition, options: CollectionInfo & { accessType: AccessType }): string | null {
     const ownershipRule = options.accessRules.ownership && options.accessRules.ownership[options.collectionName]
     if (!ownershipRule) {
         return null
@@ -198,7 +198,7 @@ function generateOwnershipCheck(collection : CollectionDefinition, options : Col
     }
 
     const fieldOnResource = `resource.data.${ownershipRule.field}`
-    
+
     if (options.accessType === 'create') {
         return `request.auth.uid == request.${fieldOnResource}`
     } else if (options.accessType === 'update') {
@@ -208,15 +208,17 @@ function generateOwnershipCheck(collection : CollectionDefinition, options : Col
     }
 }
 
-function generateValidationChecks(collection : CollectionDefinition, options : CollectionInfo) : string[] {
+function generateValidationChecks(collection: CollectionDefinition, options: CollectionInfo): string[] {
     const validationRules = options.accessRules.validation || {}
 
     const checks = []
     for (const check of validationRules[options.collectionName] || []) {
-        let expression = serializeRuleLogic(check.rule, { placeholders: {
-            'context.now': 'request.time',
-            'value': `request.resource.data.${check.field}`,
-        } })
+        let expression = serializeRuleLogic(check.rule, {
+            placeholders: {
+                'context.now': 'request.time',
+                'value': `request.resource.data.${check.field}`,
+            }
+        })
         if (collection.fields[check.field].optional) {
             expression = `((!('${check.field}' in request.resource.data)) || ${expression})`
         }
@@ -226,7 +228,7 @@ function generateValidationChecks(collection : CollectionDefinition, options : C
     return checks
 }
 
-function generatePermissionChecks(collection : CollectionDefinition, options : CollectionInfo & { accessType : AccessType }) : string[] {
+function generatePermissionChecks(collection: CollectionDefinition, options: CollectionInfo & { accessType: AccessType }): string[] {
     const permissionRules = options.accessRules.permissions && options.accessRules.permissions[options.collectionName]
     if (!permissionRules) {
         return []
@@ -237,11 +239,13 @@ function generatePermissionChecks(collection : CollectionDefinition, options : C
         return []
     }
 
-    return [serializeRuleLogic(accessTypeRule.rule, { placeholders: {
-        'context.now': 'request.time',
-    } })]
+    return [serializeRuleLogic(accessTypeRule.rule, {
+        placeholders: {
+            'context.now': 'request.time',
+        }
+    })]
 }
 
-function isGroupKey(key : string, options : { collection : CollectionDefinition }) {
+function isGroupKey(key: string, options: { collection: CollectionDefinition }) {
     return some(options.collection.groupBy || [], group => group.key === key)
 }
