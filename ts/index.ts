@@ -22,6 +22,7 @@ const WHERE_OPERATORS = {
     '$lte': '<=',
     '$gt': '>',
     '$gte': '>=',
+    '$in': 'in',
 }
 
 export class FirestoreStorageBackend extends backend.StorageBackend {
@@ -30,15 +31,22 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         collectionGrouping: true,
     }
     firebase: typeof firebaseModule
+    firebaseModule: typeof firebaseModule
     firestore: firebase.firestore.Firestore
     rootRef?: firebase.firestore.DocumentReference
 
-    constructor({ firebase, firestore: firestoreObject, rootRef }: { firebase: typeof firebaseModule, firestore: firebase.firestore.Firestore, rootRef?: firebase.firestore.DocumentReference }) {
+    constructor(options: {
+        firebase: typeof firebaseModule,
+        firebaseModule?: typeof firebaseModule,
+        firestore: firebase.firestore.Firestore,
+        rootRef?: firebase.firestore.DocumentReference
+    }) {
         super()
 
-        this.firebase = firebase
-        this.firestore = firestoreObject
-        this.rootRef = rootRef
+        this.firebase = options.firebase
+        this.firebaseModule = options.firebaseModule ?? options.firebase
+        this.firestore = options.firestore
+        this.rootRef = options.rootRef
     }
 
     async createObject(collection: string, object: any, options: backend.CreateSingleOptions): Promise<backend.CreateSingleResult> {
@@ -96,7 +104,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         } else {
             let q: firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
             for (let { field, operator, value } of _parseQueryWhere(query)) {
-                if (collectionDefinition.fields[field].type === 'timestamp') {
+                if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
                 }
                 q = q.where(field, WHERE_OPERATORS[operator], value)
@@ -122,13 +130,13 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: where, deleteGroupKeys: true })
 
         if (Object.keys(where).length === 1 && typeof pkIndex === 'string' && where[pkIndex]) {
-            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { firebase: this.firebase, collectionDefinition }))
+            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
         } else {
             const objects = await this.findObjects<any>(collection, origWhere)
 
             const batch = this.firestore.batch()
             for (const object of objects) {
-                batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { firebase: this.firebase, collectionDefinition }))
+                batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
             }
             await batch.commit()
         }
@@ -179,7 +187,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     delete toInsert[collectionDefinition.pkIndex as string]
                 }
 
-                const preparedDoc = _prepareObjectForWrite(toInsert, { firebase: this.firebase, collectionDefinition })
+                const preparedDoc = _prepareObjectForWrite(toInsert, { firebase: this.firebaseModule, collectionDefinition })
                 batch.set(docRef, preparedDoc)
 
                 if (operation.placeholder) {
@@ -215,6 +223,12 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         }
 
         return firestoreCollection
+    }
+
+    async operation(name: string, ...args: any[]) {
+        // console.log('Firestore operation', name, ...args)
+        // console.trace()
+        return super.operation(name, ...args)
     }
 }
 
