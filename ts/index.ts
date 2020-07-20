@@ -211,7 +211,11 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         let firestoreCollection = this.rootRef ? this.rootRef.collection(collection) : this.firestore.collection(collection)
         if (options && options.forObject) {
             for (const group of collectionDefiniton.groupBy || []) {
-                const containerDoc = firestoreCollection.doc(options.forObject[group.key])
+                const groupId = options.forObject[group.key]
+                if (!groupId) {
+                    throw new Error(`Tried to query grouped collection '${collection}', but did not found key '${group.key}' in query`)
+                }
+                const containerDoc = firestoreCollection.doc(groupId)
                 // if (options && options.createGroupContainers) {
                 //     containerDoc.set({})
                 // }
