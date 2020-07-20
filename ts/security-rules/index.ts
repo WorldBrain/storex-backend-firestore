@@ -106,8 +106,8 @@ export function generateCollectionNode(collection: CollectionDefinition, options
             }
 
             const typeChecks = generateFieldTypeChecks(collection, options).join(' &&\n  ')
-            const shouldExcludeTypeChecks = options.excludeTypeChecks && !(
-                typeof options.excludeTypeChecks !== 'boolean' &&
+            const shouldExcludeTypeChecks = options.excludeTypeChecks && (
+                typeof options.excludeTypeChecks === 'boolean' ||
                 options.excludeTypeChecks.includes(options.collectionName)
             )
             if (!shouldExcludeTypeChecks && typeChecks.length) {
