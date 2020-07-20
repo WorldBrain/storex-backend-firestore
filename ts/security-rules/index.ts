@@ -6,7 +6,7 @@ import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules, r
 import { MatchNode, AllowOperation } from "./ast";
 import serializeRuleLogic from './rule-logic';
 
-type BaseInfo = { excludeTypeChecks?: boolean }
+type BaseInfo = { excludeTypeChecks?: boolean | string[] }
 type ModuleInfo = BaseInfo & { moduleName: string, storageRegistry: StorageRegistry }
 type CollectionInfo = ModuleInfo & { collectionName: string, accessRules: AccessRules }
 
@@ -106,7 +106,11 @@ export function generateCollectionNode(collection: CollectionDefinition, options
             }
 
             const typeChecks = generateFieldTypeChecks(collection, options).join(' &&\n  ')
-            if ((!options.excludeTypeChecks) && typeChecks.length) {
+            const shouldExcludeTypeChecks = options.excludeTypeChecks && !(
+                typeof options.excludeTypeChecks !== 'boolean' &&
+                options.excludeTypeChecks.includes(options.collectionName)
+            )
+            if (!shouldExcludeTypeChecks && typeChecks.length) {
                 expressions.types = typeChecks
             }
         }
