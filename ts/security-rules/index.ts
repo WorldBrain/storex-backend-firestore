@@ -206,7 +206,7 @@ function generateOwnershipCheck(collection: CollectionDefinition, options: Colle
     if (options.accessType === 'create') {
         return `request.auth.uid == request.${fieldOnResource}`
     } else if (options.accessType === 'update') {
-        return `request.auth.uid == ${fieldOnResource} && (request.auth.uid == request.${fieldOnResource} || (!('${ownershipRule.field}' in request.resource.data.keys()))`
+        return `request.auth.uid == ${fieldOnResource} && (request.auth.uid == request.${fieldOnResource} || (!('${ownershipRule.field}' in request.resource.data.keys())))`
     } else {
         return `request.auth.uid == ${fieldOnResource}`
     }
