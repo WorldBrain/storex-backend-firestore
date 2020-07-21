@@ -96,7 +96,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         } else {
             let q: firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
             for (let { field, operator, value } of _parseQueryWhere(query)) {
-                if (collectionDefinition.fields[field].type === 'timestamp') {
+                if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
                 }
                 q = q.where(field, WHERE_OPERATORS[operator], value)
