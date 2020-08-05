@@ -94,20 +94,20 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         }
 
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query, deleteGroupKeys: true })
-        if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && query[pkIndex]) {
+        if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && typeof query[pkIndex] === 'string') {
             const result = await firestoreCollection.doc(query[pkIndex]).get()
             if (!result.exists) {
                 return []
             }
-            const object = result.data() as T
-            return [_prepareObjectForRead(addKeys(object, query[pkIndex]), { collectionDefinition })]
+            const objects = [result.data()] as T[]
+            return objects.map(object => _prepareObjectForRead(addKeys(object, query[pkIndex]), { collectionDefinition }))
         } else {
             let q: firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
             for (let { field, operator, value } of _parseQueryWhere(query)) {
                 if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
                 }
-                q = q.where(field, WHERE_OPERATORS[operator], value)
+                q = q.where(field === pkIndex ? firebaseModule.firestore.FieldPath.documentId() : field, WHERE_OPERATORS[operator], value)
             }
             for (const [field, order] of options.order || []) {
                 q = q.orderBy(field, order)
