@@ -107,7 +107,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
                 }
-                q = q.where(field === pkIndex ? firebaseModule.firestore.FieldPath.documentId() : field, WHERE_OPERATORS[operator], value)
+                q = q.where(field === pkIndex ? this.firebaseModule.firestore.FieldPath.documentId() : field, WHERE_OPERATORS[operator], value)
             }
             for (const [field, order] of options.order || []) {
                 q = q.orderBy(field, order)
