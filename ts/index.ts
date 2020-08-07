@@ -197,6 +197,24 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     const pkIndex = collectionDefinition.pkIndex
                     info[operation.placeholder] = { object: { [pkIndex as string]: pk, ...toInsert } }
                 }
+            } else if (operation.operation === 'deleteObjects') {
+                const collectionDefinition = this.registry.collections[operation.collection]
+                const where = operation.where
+
+                let firestoreCollection = await this.getFirestoreCollection(operation.collection, {
+                    forObject: where,
+                    createGroupContainers: true,
+                })
+
+                let pkValue = where[collectionDefinition.pkIndex as string]
+                if (!pkValue) {
+                    throw new Error(`Cannot delete objects in batch by anything other than the primary key, which was not provided`)
+                }
+                const pks = pkValue['$in'] ?? [pkValue]
+                for (const pk of pks) {
+                    const docRef = firestoreCollection.doc(pk)
+                    batch.delete(docRef)
+                }
             } else {
                 throw new Error(`Unsupported operation in batch: ${operation.operation}`)
             }
