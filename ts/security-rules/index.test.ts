@@ -6,9 +6,9 @@ import { expectSecurityRulesSerialization } from './ast.test';
 import { SharedSyncLogStorage } from './test-cases/sync';
 
 describe('Firestore security rules generation', () => {
-    type TestOptions = { modules : { [name : string] : StorageModuleConfig }, expected : string }
+    type TestOptions = { modules: { [name: string]: StorageModuleConfig }, expected: string }
 
-    async function runTest(options : TestOptions) {
+    async function runTest(options: TestOptions) {
         const ast = await generateRulesAstFromStorageModuleConfigs(options.modules)
         expectSecurityRulesSerialization(ast, options.expected)
     }
@@ -41,6 +41,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -85,6 +86,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -128,6 +130,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -170,6 +173,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
@@ -213,6 +217,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
@@ -266,6 +271,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -294,6 +300,7 @@ describe('Firestore security rules generation', () => {
             await runTest({
                 modules,
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /sharedSyncLogEntry/{userId} {
@@ -420,6 +427,7 @@ describe('Firestore security rules generation', () => {
                 },
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /foo/{foo} {
@@ -471,6 +479,7 @@ describe('Firestore security rules generation', () => {
                 },
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /foo/{foo} {
