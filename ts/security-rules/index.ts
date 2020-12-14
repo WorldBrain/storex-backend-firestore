@@ -81,7 +81,8 @@ export function generateModuleNode(module: StorageModuleConfig, options: ModuleI
 
 export function generateCollectionNode(collection: CollectionDefinition, options: CollectionInfo): MatchNode | null {
     const pkField = collection.fields[collection.pkIndex as string]
-    const pkKey = pkField.type !== 'auto-pk' ? collection.pkIndex as string : options.collectionName
+    const pkKey = !(pkField.type === 'auto-pk' && collection.pkIndex === 'id') ? collection.pkIndex as string : options.collectionName
+    // TODO: Remove hack of looking for 'auto-pk' 'id' field.
 
     const { root: rootNode, inner: collectionNode } = makeEmptyCollectionNode(collection, { ...options, pkKey })
 
