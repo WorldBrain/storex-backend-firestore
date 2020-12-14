@@ -180,7 +180,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 })
 
                 let docRef: firebase.firestore.DocumentReference
-                if (collectionDefinition.fields[collectionDefinition.pkIndex as string].type === 'auto-pk') {
+                if (collectionDefinition.fields[collectionDefinition.pkIndex as string]?.type === 'auto-pk') {
                     docRef = firestoreCollection.doc()
                 } else {
                     docRef = firestoreCollection.doc(toInsert[collectionDefinition.pkIndex as string])
