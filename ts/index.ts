@@ -78,8 +78,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         )
         const addKeys = (object: any, pk: string) => {
             let withPk
-            if (typeof pkIndex === 'string') {
-                withPk = { [pkIndex]: pk, ...object }
+            const pkField = getPkField(collectionDefinition)
+            if (typeof pkField === 'string') {
+                withPk = { [pkField]: pk, ...object }
             } else {
                 withPk = { ...object }
                 for (const pkField of pkIndex as string[]) {
@@ -94,20 +95,21 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         }
 
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query, deleteGroupKeys: true })
-        if (Object.keys(query).length === 1 && typeof pkIndex === 'string' && typeof query[pkIndex] === 'string') {
-            const result = await firestoreCollection.doc(query[pkIndex]).get()
+        const pkField = getPkField(collectionDefinition)
+        if (Object.keys(query).length === 1 && typeof query[pkField] === 'string') {
+            const result = await firestoreCollection.doc(query[pkField]).get()
             if (!result.exists) {
                 return []
             }
             const objects = [result.data()] as T[]
-            return objects.map(object => _prepareObjectForRead(addKeys(object, query[pkIndex]), { collectionDefinition }))
+            return objects.map(object => _prepareObjectForRead(addKeys(object, query[pkField]), { collectionDefinition }))
         } else {
             let q: firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
             for (let { field, operator, value } of _parseQueryWhere(query)) {
                 if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
                 }
-                q = q.where(field === pkIndex ? this.firebaseModule.firestore.FieldPath.documentId() : field, WHERE_OPERATORS[operator], value)
+                q = q.where(field === pkField ? this.firebaseModule.firestore.FieldPath.documentId() : field, WHERE_OPERATORS[operator], value)
             }
             for (const [field, order] of options.order || []) {
                 q = q.orderBy(field, order)
@@ -124,37 +126,37 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
     async updateObjects(collection: string, where: any, updates: any, options: backend.UpdateManyOptions): Promise<backend.UpdateManyResult> {
         const collectionDefinition = this.registry.collections[collection]
-        const pkIndex = collectionDefinition.pkIndex
 
         const origWhere = { ...where }
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: where, deleteGroupKeys: true })
 
-        if (Object.keys(where).length === 1 && typeof pkIndex === 'string' && where[pkIndex]) {
-            await firestoreCollection.doc(where[pkIndex]).update(_prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
+        const pkField = getPkField(collectionDefinition)
+        if (Object.keys(where).length === 1 && where[pkField]) {
+            await firestoreCollection.doc(where[pkField]).update(_prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
         } else {
             const objects = await this.findObjects<any>(collection, origWhere)
 
             const batch = this.firestore.batch()
             for (const object of objects) {
-                batch.update(firestoreCollection.doc(object[pkIndex as string]), _prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
+                batch.update(firestoreCollection.doc(object[pkField]), _prepareObjectForWrite(updates, { firebase: this.firebaseModule, collectionDefinition }))
             }
             await batch.commit()
         }
     }
 
     async deleteObjects(collection: string, query: any, options: backend.DeleteManyOptions): Promise<backend.DeleteManyResult> {
-        const collectionDefiniton = this.registry.collections[collection]
-        const pkIndex = collectionDefiniton.pkIndex as string
-        if (Object.keys(query).length > 1 && !query[pkIndex]) {
+        const collectionDefinition = this.registry.collections[collection]
+        const pkField = getPkField(collectionDefinition)
+        if (Object.keys(query).length > 1 && !query[pkField]) {
             throw new Error('Only deletes by pk are supported for now')
         }
 
         const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query })
-        if (!query[pkIndex]['$in']) {
-            await firestoreCollection.doc(query[pkIndex]).delete()
+        if (!query[pkField]['$in']) {
+            await firestoreCollection.doc(query[pkField]).delete()
         } else {
             const batch = this.firestore.batch()
-            for (const pk of query[pkIndex]['$in']) {
+            for (const pk of query[pkField]['$in']) {
                 batch.delete(firestoreCollection.doc(pk))
             }
             await batch.commit()
@@ -183,7 +185,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 if (collectionDefinition.fields[collectionDefinition.pkIndex as string]?.type === 'auto-pk') {
                     docRef = firestoreCollection.doc()
                 } else {
-                    docRef = firestoreCollection.doc(toInsert[collectionDefinition.pkIndex as string])
+                    const pkField = getPkField(collectionDefinition)
+                    docRef = firestoreCollection.doc(toInsert[pkField])
                     delete toInsert[collectionDefinition.pkIndex as string]
                 }
 
@@ -206,7 +209,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     createGroupContainers: true,
                 })
 
-                let pkValue = where[collectionDefinition.pkIndex as string]
+                const pkField = getPkField(collectionDefinition)
+                let pkValue = where[pkField]
                 if (!pkValue) {
                     throw new Error(`Cannot delete objects in batch by anything other than the primary key, which was not provided`)
                 }
@@ -350,4 +354,15 @@ export function _getCollectionFielsToProcess(collectionDefinition: CollectionDef
         }
     }
     return fieldsToProcess
+}
+
+function getPkField(collectionDefinition: CollectionDefinition) {
+    const pkIndex = collectionDefinition.pkIndex
+    if (pkIndex instanceof Array) {
+        throw new Error(`The Firestore backend doesn't support compound indices. You tried to use one on the collection '${collectionDefinition.name!}'`)
+    }
+    if (typeof pkIndex === 'object' && pkIndex.relationship) {
+        return pkIndex.relationship
+    }
+    return pkIndex as string
 }
