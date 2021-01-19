@@ -182,11 +182,12 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 })
 
                 let docRef: firebase.firestore.DocumentReference
-                if (collectionDefinition.fields[collectionDefinition.pkIndex as string]?.type === 'auto-pk') {
+                const pkField = getPkField(collectionDefinition)
+                const pkValue = toInsert[pkField]
+                if (!pkValue && collectionDefinition.fields[collectionDefinition.pkIndex as string]?.type === 'auto-pk') {
                     docRef = firestoreCollection.doc()
                 } else {
-                    const pkField = getPkField(collectionDefinition)
-                    docRef = firestoreCollection.doc(toInsert[pkField])
+                    docRef = firestoreCollection.doc(pkValue)
                     delete toInsert[collectionDefinition.pkIndex as string]
                 }
 
