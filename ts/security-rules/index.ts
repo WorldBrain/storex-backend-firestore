@@ -81,7 +81,7 @@ export function generateModuleNode(module: StorageModuleConfig, options: ModuleI
 
 export function generateCollectionNode(collection: CollectionDefinition, options: CollectionInfo): MatchNode | null {
     const pkField = collection.fields[collection.pkIndex as string]
-    const pkKey = pkField?.type !== 'auto-pk' ? collection.pkIndex as string : options.collectionName
+    const pkKey = pkField?.type !== 'auto-pk' ? collection.pkIndex as (string | { relationship: string }) : options.collectionName
 
     const { root: rootNode, inner: collectionNode } = makeEmptyCollectionNode(collection, { ...options, pkKey })
 
@@ -137,19 +137,26 @@ export function generateCollectionNode(collection: CollectionDefinition, options
     return rootNode
 }
 
-function makeEmptyCollectionNode(collection: CollectionDefinition, options: CollectionInfo & { pkKey: string }): { root: MatchNode, inner: MatchNode } {
+function makeEmptyCollectionNode(collection: CollectionDefinition, options: CollectionInfo & { pkKey: string | { relationship: string } }): { root: MatchNode, inner: MatchNode } {
     const groupKeys = (collection.groupBy || []).map(group => group.key)
     const keys = [...groupKeys, options.pkKey]
+    const shiftKey = () => {
+        let key = keys.shift()
+        if (typeof key === 'object' && 'relationship' in key) {
+            key = key.relationship
+        }
+        return key
+    }
     let inner: MatchNode = {
         type: 'match',
-        path: `/${options.collectionName}/{${keys.shift()}}`,
+        path: `/${options.collectionName}/{${shiftKey()}}`,
         content: []
     }
     const root = inner
     for (const group of collection.groupBy || []) {
         const childNode: MatchNode = {
             type: 'match',
-            path: `/${group.subcollectionName}/{${keys.shift()}}`,
+            path: `/${group.subcollectionName}/{${shiftKey()}}`,
             content: []
         }
         inner.content.push(childNode)
@@ -194,7 +201,8 @@ function generateOwnershipCheck(collection: CollectionDefinition, options: Colle
         return null
     }
 
-    const fieldIsPathParam = collection.pkIndex === ownershipRule.field
+    const fieldName = (typeof collection.pkIndex !== 'string' && 'relationship' in collection.pkIndex) ? collection.pkIndex.relationship : collection.pkIndex
+    const fieldIsPathParam = fieldName === ownershipRule.field
     const fieldIsGroupKey = isGroupKey(ownershipRule.field, { collection })
 
     if (fieldIsPathParam || fieldIsGroupKey) {
