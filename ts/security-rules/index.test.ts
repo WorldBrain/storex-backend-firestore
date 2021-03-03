@@ -93,7 +93,7 @@ describe('Firestore security rules generation', () => {
                             allow create: if
                               // Type checks
                               request.resource.data.fieldBool is bool &&
-                              (!('fieldString' in request.resource.data.keys()) || request.resource.data.fieldString is string) &&
+                              (!('fieldString' in request.resource.data.keys()) || request.resource.data.fieldString == null || request.resource.data.fieldString is string) &&
                 
                               // Permission rules
                               true
@@ -277,7 +277,7 @@ describe('Firestore security rules generation', () => {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              (!('updatedWhen' in request.resource.data.keys()) || request.resource.data.updatedWhen is timestamp) &&
+                              (!('updatedWhen' in request.resource.data.keys()) || request.resource.data.updatedWhen == null || request.resource.data.updatedWhen is timestamp) &&
                               request.resource.data.content is string &&
                 
                               // Validation rules

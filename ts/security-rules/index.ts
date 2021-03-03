@@ -181,9 +181,10 @@ function generateFieldTypeChecks(collection: CollectionDefinition, options: Coll
             throw new Error(`Could not map type ${fieldConfig.type} of ${options.collectionName}.${fieldName} to Firestore type`)
         }
 
-        let check = `request.resource.data.${fieldName} is ${firestoreFieldType}`
+        const fieldAccess = `request.resource.data.${fieldName}`
+        let check = `${fieldAccess} is ${firestoreFieldType}`
         if (fieldConfig.optional) {
-            check = `(!('${fieldName}' in request.resource.data.keys()) || ${check})`
+            check = `(!('${fieldName}' in request.resource.data.keys()) || ${fieldAccess} == null || ${check})`
         }
         checks.push(check)
     }
