@@ -2,7 +2,7 @@ import flatten from 'lodash/flatten'
 import some from 'lodash/some'
 import mapValues from 'lodash/mapValues'
 import { StorageRegistry, CollectionDefinition } from "@worldbrain/storex";
-import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules, registerModuleMapCollections } from "@worldbrain/storex-pattern-modules";
+import { StorageModuleInterface, StorageModuleConfig, AccessType, AccessRules, registerModuleMapCollections, RulePreparation } from "@worldbrain/storex-pattern-modules";
 import { MatchNode, AllowOperation } from "./ast";
 import serializeRuleLogic from './rule-logic';
 
@@ -96,7 +96,12 @@ export function generateCollectionNode(collection: CollectionDefinition, options
 
             const permissionChecks = generatePermissionChecks(collection, { ...options, accessType }).join(' && ')
             if (permissionChecks) {
-                expressions.permissions = permissionChecks
+                if (ownershipCheck) {
+                    delete expressions.ownership
+                    expressions.permissions = `(${ownershipCheck} || ${permissionChecks})`
+                } else {
+                    expressions.permissions = permissionChecks
+                }
             }
         }
         if (Object.keys(expressions).length && (accessType === 'create' || accessType === 'update')) {
@@ -252,11 +257,42 @@ function generatePermissionChecks(collection: CollectionDefinition, options: Col
         return []
     }
 
+    const preparations: { [key: string]: string } = {}
+    for (const preparation of accessTypeRule.prepare ?? []) {
+        preparations[preparation.placeholder] = generateRulePreparation(collection, preparation)
+    }
+
     return [serializeRuleLogic(accessTypeRule.rule, {
         placeholders: {
             'context.now': 'request.time',
+            'value': 'request.resource.data',
+            ...preparations,
         }
     })]
+}
+
+function generateRulePreparation(collection: CollectionDefinition, preparation: RulePreparation) {
+    if (preparation.operation !== 'findObject') {
+        throw new Error(`Cannot generate rule preparation with unknown operation: ${preparation.operation}`)
+    }
+    const pkKey = collection.pkIndex as (string | { relationship: string })
+    if (typeof pkKey !== 'string' && typeof pkKey['relationship'] !== 'string') {
+        throw new Error(`Could not generate rule preparation for collection unsupported pkIndex: ${preparation.collection}`)
+    }
+    const pkFieldName = typeof pkKey === 'string' ? pkKey : pkKey.relationship
+    if (Object.keys(preparation.where).length !== 1 || !preparation.where['id']) {
+        throw new Error(`A rule 'findObject' rule preparation must have a where filtering on the pkIndex for collection: ${preparation.collection}`)
+    }
+    const pkFilter = preparation.where[pkFieldName]
+    const pkAccess = serializeRuleLogic(pkFilter, {
+        placeholders: {
+            'context.now': 'request.time',
+            'value': 'request.resource.data',
+        }
+    })
+
+    const path = `/databases/$(database)/documents/${preparation.collection}/$(${pkAccess})`
+    return `get(${path}).data`
 }
 
 function isGroupKey(key: string, options: { collection: CollectionDefinition }) {

@@ -237,6 +237,107 @@ describe('Firestore security rules generation', () => {
         })
     })
 
+    describe('permissions', () => {
+        it('should generate permission rules that access the database', async () => {
+            await runTest({
+                modules: {
+                    test: {
+                        collections: {
+                            list: {
+                                version: new Date(),
+                                fields: {
+                                    content: { type: 'text' },
+                                    creator: { type: 'text' },
+                                }
+                            },
+                            entry: {
+                                version: new Date(),
+                                fields: {
+                                    content: { type: 'text' },
+                                    creator: { type: 'text' },
+                                },
+                                relationships: [
+                                    { childOf: 'list' }
+                                ]
+                            },
+                        },
+                        accessRules: {
+                            ownership: {
+                                list: {
+                                    field: 'creator',
+                                    access: ['create']
+                                },
+                                entry: {
+                                    field: 'creator',
+                                    access: ['create']
+                                },
+                            },
+                            permissions: {
+                                list: {
+                                    list: { rule: true },
+                                    read: { rule: true },
+                                },
+                                entry: {
+                                    list: { rule: true }, read: { rule: true }, create: {
+                                        prepare: [
+                                            {
+                                                placeholder: 'list', operation: 'findObject', collection: 'sharedList',
+                                                where: { id: '$value.list' },
+                                            }
+                                        ],
+                                        rule: { eq: ['$list.creator', '$value.creator'] }
+                                    }
+                                },
+                            },
+                        }
+                    },
+                },
+                expected: `
+                rules_version = '2';
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /list/{list} {
+                            allow list: if
+                              // Permission rules
+                              true
+                            ;
+                            allow get: if
+                              // Permission rules
+                              true
+                            ;                            
+                            allow create: if
+                              // Type checks
+                              request.resource.data.content is string &&
+                              request.resource.data.creator is string &&
+                
+                              // Ownership rules
+                              request.auth.uid == request.resource.data.creator
+                            ;
+                        }
+                        match /entry/{entry} {
+                            allow list: if
+                              // Permission rules
+                              true
+                            ;
+                            allow get: if
+                              // Permission rules
+                              true
+                            ;                            
+                            allow create: if
+                              // Type checks
+                              request.resource.data.content is string &&
+                              request.resource.data.creator is string &&
+                
+                              // Permission rules
+                              (request.auth.uid == request.resource.data.creator || (get(/databases/$(database)/documents/sharedList/$(request.resource.data.list)).data.creator == request.resource.data.creator))
+                            ;
+                        }
+                    }
+                }`
+            })
+        })
+    })
+
     describe('validation', () => {
         it('should generate custom validation rules', async () => {
             await runTest({

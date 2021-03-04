@@ -7,6 +7,8 @@ function normalizeWithSpace(s: string): string {
 }
 
 export function expectSecurityRulesSerialization(root: MatchNode, expected: string) {
+    // console.log(normalizeWithSpace(stripIndent(serializeRulesAst(root))))
+    // if (1) return
     expect('\n' + normalizeWithSpace(stripIndent(serializeRulesAst(root))))
         .toEqual(normalizeWithSpace(stripIndent(expected)))
 }
