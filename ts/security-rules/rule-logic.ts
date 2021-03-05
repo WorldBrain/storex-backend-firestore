@@ -1,6 +1,21 @@
-import { RuleLogic, RuleLogicBinaryOp, RuleLogicBinaryOpKey, RuleLogicValue } from "@worldbrain/storex-pattern-modules";
+import { RuleLogic, RuleLogicBinaryOp, RuleLogicBinaryOpKey, RuleLogicValue, RuleLogicExists } from "@worldbrain/storex-pattern-modules";
 
-type SerializationOptions = { placeholders: { [name: string]: string } }
+export interface RuleLogicStackFrame {
+    child: RuleLogic
+}
+
+export type RuleLogicPlaceHolderFunction = (params: {
+    relativePath: string[];
+    stack: RuleLogicStackFrame[];
+}) => string;
+
+export type RuleLogicPlaceHolder = string | RuleLogicPlaceHolderFunction;
+
+export type RuleLogicPlaceholders = {
+    [name: string]: RuleLogicPlaceHolder;
+};
+
+type SerializationOptions = { placeholders: RuleLogicPlaceholders, stack?: RuleLogicStackFrame[] }
 
 const BINARY_OPS: { [Key in RuleLogicBinaryOpKey]: string } = {
     or: '||',
@@ -18,9 +33,11 @@ const CHAINABLE_BINARY_OPS = new Set<RuleLogicBinaryOpKey>(['and', 'or'])
 
 export default function serializeRuleLogic(logic: RuleLogic, options: SerializationOptions): string {
     if (isRuleLogicValue(logic)) {
-        return serializeValue(logic, options)
+        return serializeValue(logic, { ...options, stack: [...(options.stack ?? []), { child: logic }] })
     } else if (isBinaryOp(logic)) {
-        return serializeBinaryOp(logic, options)
+        return serializeBinaryOp(logic, { ...options, stack: [...(options.stack ?? []), { child: logic }] })
+    } else if (isExists(logic)) {
+        return serializeRuleLogic(logic.exists, { ...options, stack: [...(options.stack ?? []), { child: logic }] })
     } else {
         throw new Error(`Detected unknown access rule expression: ${JSON.stringify(logic)}`)
     }
@@ -35,9 +52,14 @@ function serializeValue(value: RuleLogicValue, options: SerializationOptions): s
             const sliceEnd = -i || undefined
             const placeholderComponents = pathComponents.slice(0, sliceEnd)
             const key = placeholderComponents.join('.')
-            if (options.placeholders[key]) {
+            const placeholder = options.placeholders[key]
+            if (placeholder) {
                 const restComponents = pathComponents.slice(pathComponents.length - i)
-                return [options.placeholders[key], ...restComponents].join('.')
+                if (typeof placeholder === 'string') {
+                    return [options.placeholders[key], ...restComponents].join('.')
+                } else {
+                    return placeholder({ relativePath: restComponents, stack: options.stack })
+                }
             }
         }
         throw new Error(`Could not find value '${value}'`)
@@ -73,4 +95,9 @@ function isBinaryOp(logic: RuleLogic): logic is RuleLogicBinaryOp {
 
 function isRuleLogicValue(logic: RuleLogic): logic is RuleLogicValue {
     return logic === null || typeof logic === 'number' || typeof logic === 'string' || typeof logic === 'boolean'
+}
+
+function isExists(logic: RuleLogic): logic is RuleLogicExists {
+    const keys = Object.keys(logic || {})
+    return keys.length === 1 && keys[0] === 'exists'
 }
