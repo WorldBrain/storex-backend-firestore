@@ -285,7 +285,7 @@ describe('Firestore security rules generation', () => {
                                                 where: { id: '$value.list' },
                                             }
                                         ],
-                                        rule: { eq: ['$list.creator', '$value.creator'] }
+                                        rule: { and: ['$ownership', { eq: ['$list.creator', '$value.creator'] }] }
                                     }
                                 },
                             },
@@ -329,7 +329,7 @@ describe('Firestore security rules generation', () => {
                               request.resource.data.creator is string &&
                 
                               // Permission rules
-                              (request.auth.uid == request.resource.data.creator || (get(/databases/$(database)/documents/sharedList/$(request.resource.data.list)).data.creator == request.resource.data.creator))
+                              (request.auth.uid == request.resource.data.creator && (get(/databases/$(database)/documents/sharedList/$(request.resource.data.list)).data.creator == request.resource.data.creator))
                             ;
                         }
                     }

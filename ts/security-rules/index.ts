@@ -94,14 +94,10 @@ export function generateCollectionNode(collection: CollectionDefinition, options
                 expressions.ownership = ownershipCheck
             }
 
-            const permissionChecks = generatePermissionChecks(collection, { ...options, accessType }).join(' && ')
+            const permissionChecks = generatePermissionChecks(collection, { ...options, accessType, ownershipCheck }).join(' && ')
             if (permissionChecks) {
-                if (ownershipCheck) {
-                    delete expressions.ownership
-                    expressions.permissions = `(${ownershipCheck} || ${permissionChecks})`
-                } else {
-                    expressions.permissions = permissionChecks
-                }
+                delete expressions.ownership
+                expressions.permissions = permissionChecks
             }
         }
         if (Object.keys(expressions).length && (accessType === 'create' || accessType === 'update')) {
@@ -246,7 +242,7 @@ function generateValidationChecks(collection: CollectionDefinition, options: Col
     return checks
 }
 
-function generatePermissionChecks(collection: CollectionDefinition, options: CollectionInfo & { accessType: AccessType }): string[] {
+function generatePermissionChecks(collection: CollectionDefinition, options: CollectionInfo & { accessType: AccessType, ownershipCheck: string }): string[] {
     const permissionRules = options.accessRules.permissions && options.accessRules.permissions[options.collectionName]
     if (!permissionRules) {
         return []
@@ -266,6 +262,7 @@ function generatePermissionChecks(collection: CollectionDefinition, options: Col
         placeholders: {
             'context.now': 'request.time',
             'value': 'request.resource.data',
+            'ownership': options.ownershipCheck,
             ...preparations,
         }
     })]
