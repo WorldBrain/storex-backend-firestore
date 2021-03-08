@@ -295,7 +295,7 @@ function generateRulePreparation(preparation: RulePreparation, options: AccessIn
     const placeholder: RuleLogicPlaceHolderFunction = ({ relativePath, stack }) => {
         const path = generateRulePreparationAccess(preparation, options)
         const isExists = (stack.slice(-2)[0].child as RuleLogicExists).exists
-        return isExists ? `exists(${path})` : `get(${path}).data`
+        return isExists ? `exists(${path})` : [`get(${path}).data`, ...relativePath].join('.')
     }
     return placeholder
 }
@@ -331,9 +331,9 @@ function generateRulePreparationAccess(preparation: RulePreparation, options: Ac
         if (!groupFilter) {
             throw new Error(`No filter for group key '${group.key}' found in 'findObject' rule preparation for of collection: ${preparation.collection}`)
         }
-        groupAccess.push(`${group.subcollectionName}/${serializeRuleLogic(groupFilter, {
+        groupAccess.push(`$(${serializeRuleLogic(groupFilter, {
             placeholders: placeholders
-        })}/`)
+        })})/${group.subcollectionName}/`)
     }
 
     if (Object.keys(preparation.where).length !== (1 + (targetCollection.groupBy || []).length)) {
