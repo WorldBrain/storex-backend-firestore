@@ -126,10 +126,6 @@ export function generateCollectionNode(options: CollectionInfo): MatchNode | nul
             }
         }
 
-        if (options.collectionName === 'sharedListRole') {
-            console.log(require('util').inspect(expressions, { depth: null }))
-        }
-
         if (Object.keys(expressions).length) {
             collectionNode.content.push({
                 type: 'allow',
