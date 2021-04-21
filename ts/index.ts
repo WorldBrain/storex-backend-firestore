@@ -1,4 +1,4 @@
-import * as firebaseModule from 'firebase'
+import firebaseModule from 'firebase'
 import { dissectCreateObjectOperation, convertCreateObjectDissectionToBatch, setIn } from '@worldbrain/storex/lib/utils'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features';
@@ -32,14 +32,14 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
     }
     firebase: typeof firebaseModule
     firebaseModule: typeof firebaseModule
-    firestore: firebase.firestore.Firestore
-    rootRef?: firebase.firestore.DocumentReference
+    firestore: firebaseModule.firestore.Firestore
+    rootRef?: firebaseModule.firestore.DocumentReference
 
     constructor(options: {
         firebase: typeof firebaseModule,
         firebaseModule?: typeof firebaseModule,
-        firestore: firebase.firestore.Firestore,
-        rootRef?: firebase.firestore.DocumentReference
+        firestore: firebaseModule.firestore.Firestore,
+        rootRef?: firebaseModule.firestore.DocumentReference
     }) {
         super()
 
@@ -104,7 +104,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
             const objects = [result.data()] as T[]
             return objects.map(object => _prepareObjectForRead(addKeys(object, query[pkField]), { collectionDefinition }))
         } else {
-            let q: firebase.firestore.CollectionReference | firebase.firestore.Query = firestoreCollection
+            let q: firebaseModule.firestore.CollectionReference | firebaseModule.firestore.Query = firestoreCollection
             for (let { field, operator, value } of _parseQueryWhere(query)) {
                 if (collectionDefinition.fields[field]?.type === 'timestamp') {
                     value = new Date(value)
@@ -181,7 +181,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     createGroupContainers: true,
                 })
 
-                let docRef: firebase.firestore.DocumentReference
+                let docRef: firebaseModule.firestore.DocumentReference
                 const pkField = getPkField(collectionDefinition)
                 const pkValue = toInsert[pkField]
                 if (!pkValue && collectionDefinition.fields[collectionDefinition.pkIndex as string]?.type === 'auto-pk') {
@@ -328,7 +328,7 @@ export function _prepareObjectForRead(object: any, options: { collectionDefiniti
 
     for (const { fieldName, reason } of fieldsToProcess) {
         if (reason === FieldProccessingReason.isTimestamp) {
-            const value = object[fieldName] as firebase.firestore.Timestamp
+            const value = object[fieldName] as firebaseModule.firestore.Timestamp
             object[fieldName] = value && value.toMillis()
         }
     }
