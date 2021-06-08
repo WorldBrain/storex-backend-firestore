@@ -201,7 +201,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     const pkIndex = collectionDefinition.pkIndex
                     info[operation.placeholder] = { object: { [pkIndex as string]: pk, ...toInsert } }
                 }
-            } else if (operation.operation === 'deleteObjects') {
+            } else if (operation.operation === 'deleteObjects' || operation.operation === 'updateObjects') {
                 const collectionDefinition = this.registry.collections[operation.collection]
                 const where = operation.where
 
@@ -211,17 +211,28 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 })
 
                 const pkField = getPkField(collectionDefinition)
-                let pkValue = where[pkField]
+                const pkValue = where[pkField]
                 if (!pkValue) {
-                    throw new Error(`Cannot delete objects in batch by anything other than the primary key, which was not provided`)
+                    throw new Error(`Cannot ${
+                        operation.operation === 'deleteObjects' ? 'delete' : 'update'
+                        } objects in batch by anything other than the primary key, which was not provided`)
                 }
                 const pks = pkValue['$in'] ?? [pkValue]
-                for (const pk of pks) {
-                    const docRef = firestoreCollection.doc(pk)
-                    batch.delete(docRef)
+
+                if (operation.operation === 'deleteObjects') {
+                    for (const pk of pks) {
+                        const docRef = firestoreCollection.doc(pk)
+                        batch.delete(docRef)
+                    }
+                } else if (operation.operation === 'updateObjects') {
+                    for (const pk of pks) {
+                        const docRef = firestoreCollection.doc(pk)
+                        const updates = _prepareObjectForWrite(operation.updates, { firebase: this.firebaseModule, collectionDefinition, forUpdate: true })
+                        batch.update(docRef, updates)
+                    }
                 }
             } else {
-                throw new Error(`Unsupported operation in batch: ${operation.operation}`)
+                throw new Error(`Unsupported operation in batch: ${(operation as any).operation}`)
             }
         }
         await batch.commit()
@@ -286,7 +297,7 @@ export function _parseQueryWhere(where: any): Array<{ field: string, operator: s
     return parsed
 }
 
-export function _prepareObjectForWrite(object: any, options: { firebase: typeof firebaseModule, collectionDefinition: CollectionDefinition }): any {
+export function _prepareObjectForWrite(object: any, options: { firebase: typeof firebaseModule, collectionDefinition: CollectionDefinition, forUpdate?: boolean }): any {
     const fieldsToProcess = _getCollectionFielsToProcess(options.collectionDefinition)
     if (!fieldsToProcess.length) {
         return object
