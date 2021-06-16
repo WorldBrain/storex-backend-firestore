@@ -6,7 +6,10 @@ import { CollectionDefinition } from '@worldbrain/storex';
 
 const firebaseUtil = require('@firebase/util')
 if (firebaseUtil.isReactNative) {
-    firebaseUtil.isReactNative = () => true
+    try {
+        firebaseUtil.isReactNative = () => true
+    } catch (e) {
+    }
 }
 
 enum FieldProccessingReason {
