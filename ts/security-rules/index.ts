@@ -28,6 +28,7 @@ const FIELD_TYPE_MAP = {
     int: 'number',
     float: 'float',
     timestamp: 'timestamp',
+    json: 'any'
 }
 
 const ACCESS_TYPE_MAP: { [Type in AccessType]: AllowOperation } = {
@@ -195,6 +196,9 @@ function generateFieldTypeChecks(options: AccessInfo): string[] {
         if (!firestoreFieldType) {
             throw new Error(`Could not map type ${fieldConfig.type} of ${options.collectionName}.${fieldName} to Firestore type`)
         }
+        if (firestoreFieldType === 'any') {
+            continue
+        }
 
         const fieldAccess = `request.resource.data.${fieldName}`
         let check = `${fieldAccess} is ${firestoreFieldType}`
@@ -215,7 +219,7 @@ function generateOwnershipCheck(options: AccessInfo): string | null {
         return null
     }
 
-    const accessTypeMatches = ownershipRule.access !== 'full' && ownershipRule.access.indexOf(options.accessType) >= 0
+    const accessTypeMatches = ownershipRule.access === 'full' || ownershipRule.access.indexOf(options.accessType) >= 0
     if (!accessTypeMatches) {
         return null
     }
