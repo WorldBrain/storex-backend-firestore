@@ -149,12 +149,16 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
     async deleteObjects(collection: string, query: any, options: backend.DeleteManyOptions): Promise<backend.DeleteManyResult> {
         const collectionDefinition = this.registry.collections[collection]
+        const firestoreCollection = await this.getFirestoreCollection(collection, {
+            forObject: query,
+            deleteGroupKeys: true,
+        })
+
         const pkField = getPkField(collectionDefinition)
-        if (Object.keys(query).length > 1 && !query[pkField]) {
+        if (Object.keys(query).length !== 1 || !query[pkField]) {
             throw new Error('Only deletes by pk are supported for now')
         }
 
-        const firestoreCollection = await this.getFirestoreCollection(collection, { forObject: query })
         if (!query[pkField]['$in']) {
             await firestoreCollection.doc(query[pkField]).delete()
         } else {
