@@ -1,4 +1,4 @@
-import type firebaseModule from 'firebase/compat'
+import type firebaseModule from 'firebase-admin'
 import {
     dissectCreateObjectOperation,
     convertCreateObjectDissectionToBatch,
