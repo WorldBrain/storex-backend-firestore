@@ -51,6 +51,6 @@
   "peerDependencies": {
     "@worldbrain/storex": "^0.4.1",
     "@worldbrain/storex-pattern-modules": "^0.4.0",
-    "firebase": "^8.4.1"
+    "firebase": "^9.12.1"
   }
 }
