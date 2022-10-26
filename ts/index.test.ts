@@ -3,6 +3,7 @@ import * as path from 'path'
 import expect from 'expect'
 import firebase from '@firebase/testing'
 import StorageManager from '@worldbrain/storex'
+import { initializeTestEnvironment } from '@firebase/rules-unit-testing'
 import {
     createTestStorageManager,
     testStorageBackend,
@@ -39,13 +40,20 @@ describe('FirestoreStorageBackend', () => {
         }
     })()
 
-    async function createBackend() {
-        const firebaseApp = firebase.initializeTestApp({
+    async function runTest(
+        test: (backend: FirestoreStorageBackend) => Promise<void>,
+    ) {
+        const testEnv = await initializeTestEnvironment({
             projectId: `unit-test-${Date.now()}`,
+            firestore: { host: 'localhost', port: 8080 },
         })
-        return new FirestoreStorageBackend({
-            firebase: firebase as any,
-            firestore: firebaseApp.firestore() as any,
+        await testEnv.withSecurityRulesDisabled(async (firebaseApp) => {
+            const firestore = firebaseApp.firestore()
+            const backend = new FirestoreStorageBackend({
+                firebase: firestore.app as any,
+                firestore: firestore as any,
+            })
+            await test(backend)
         })
     }
 
@@ -63,8 +71,10 @@ describe('FirestoreStorageBackend', () => {
         // unittestFirestoreRef = await firebase.firestore().collection('unittests').add({})
     })
 
-    testStorageBackend(createBackend)
-    testFirestoreSpecifics(createBackend)
+    // TODO: Update generic storage backend tests to work with `@firebase/rules-unit-testing`
+    // testStorageBackend(createBackend)
+
+    testFirestoreSpecifics(runTest)
 
     // afterEach(async () => {
     //     await unittestFirestoreRef.delete()
@@ -103,120 +113,128 @@ describe('Query where parsing', () => {
 })
 
 function testFirestoreSpecifics(
-    createBackend: () => Promise<FirestoreStorageBackend>,
+    runTest: (
+        test: (backend: FirestoreStorageBackend) => Promise<void>,
+    ) => Promise<void>,
 ) {
     describe('collection grouping', () => {
         it('should correctly store collections grouped by fields', async () => {
-            const backend = await createBackend()
-            const storageManager = new StorageManager({ backend: backend })
-            storageManager.registry.registerCollections({
-                note: {
-                    version: new Date(),
-                    fields: {
-                        userId: { type: 'string' },
-                        listId: { type: 'string' },
-                        label: { type: 'string' },
+            await runTest(async (backend) => {
+                const storageManager = new StorageManager({ backend })
+                storageManager.registry.registerCollections({
+                    note: {
+                        version: new Date(),
+                        fields: {
+                            userId: { type: 'string' },
+                            listId: { type: 'string' },
+                            label: { type: 'string' },
+                        },
+                        groupBy: [
+                            { key: 'userId', subcollectionName: 'lists' },
+                        ],
+                        pkIndex: 'listId',
                     },
-                    groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
-                    pkIndex: 'listId',
-                },
-            })
-            await storageManager.finishInitialization()
+                })
+                await storageManager.finishInitialization()
 
-            await storageManager
-                .collection('note')
-                .createObject({
+                await storageManager.collection('note').createObject({
                     userId: 'user-1',
                     listId: 'list-1',
                     label: 'foo note',
                 })
-            const snapshot = await (
-                await backend.getFirestoreCollection('note')
-            )
-                .doc('user-1')
-                .collection('lists')
-                .doc('list-1')
-                .get()
+                const snapshot = await (
+                    await backend.getFirestoreCollection('note')
+                )
+                    .doc('user-1')
+                    .collection('lists')
+                    .doc('list-1')
+                    .get()
 
-            expect(snapshot.data()).toEqual({
-                label: 'foo note',
+                expect(snapshot.data()).toEqual({
+                    label: 'foo note',
+                })
             })
         })
 
         it('should correctly retrieve collections grouped by fields', async () => {
-            const backend = await createBackend()
-            const storageManager = new StorageManager({ backend: backend })
-            storageManager.registry.registerCollections({
-                note: {
-                    version: new Date(),
-                    fields: {
-                        userId: { type: 'string' },
-                        listId: { type: 'string' },
-                        label: { type: 'string' },
+            await runTest(async (backend) => {
+                const storageManager = new StorageManager({ backend })
+                storageManager.registry.registerCollections({
+                    note: {
+                        version: new Date(),
+                        fields: {
+                            userId: { type: 'string' },
+                            listId: { type: 'string' },
+                            label: { type: 'string' },
+                        },
+                        groupBy: [
+                            { key: 'userId', subcollectionName: 'lists' },
+                        ],
+                        pkIndex: 'listId',
                     },
-                    groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
-                    pkIndex: 'listId',
-                },
-            })
-            await storageManager.finishInitialization()
+                })
+                await storageManager.finishInitialization()
 
-            await storageManager
-                .collection('note')
-                .createObject({
+                await storageManager.collection('note').createObject({
                     userId: 'user-1',
                     listId: 'list-1',
                     label: 'foo note',
                 })
 
-            const notes = await storageManager
-                .collection('note')
-                .findObjects({ userId: 'user-1', listId: 'list-1' })
-            expect(notes).toEqual([
-                { userId: 'user-1', listId: 'list-1', label: 'foo note' },
-            ])
+                const notes = await storageManager
+                    .collection('note')
+                    .findObjects({ userId: 'user-1', listId: 'list-1' })
+                expect(notes).toEqual([
+                    { userId: 'user-1', listId: 'list-1', label: 'foo note' },
+                ])
+            })
+        })
         })
     })
 
     describe('timestamp', () => {
         it('should correctly handle $now values', async () => {
-            const backend = await createBackend()
-            const storageManager = new StorageManager({ backend: backend })
-            storageManager.registry.registerCollections({
-                note: {
-                    version: new Date(),
-                    fields: {
-                        createdWhen: { type: 'timestamp' },
+            await runTest(async (backend) => {
+                const storageManager = new StorageManager({ backend: backend })
+                storageManager.registry.registerCollections({
+                    note: {
+                        version: new Date(),
+                        fields: {
+                            createdWhen: { type: 'timestamp' },
+                        },
                     },
-                },
+                })
+                await storageManager.finishInitialization()
+
+                const beforeInsert = Date.now()
+                const { object } = await storageManager
+                    .collection('note')
+                    .createObject({ createdWhen: '$now' })
+                const afterInsert = Date.now()
+                const snapshot = await (
+                    await backend.getFirestoreCollection('note')
+                )
+                    .doc(object.id)
+                    .get()
+                expect(snapshot.data()).toMatchObject({
+                    createdWhen: expect.any(Number),
+                })
+
+                const retrievedCreatedWhen = ((snapshot.data() as any)
+                    .createdWhen as firebase.firestore.Timestamp).toMillis()
+                expect(retrievedCreatedWhen).toBeGreaterThan(beforeInsert)
+                expect(retrievedCreatedWhen).toBeLessThan(afterInsert)
+
+                const retrievedNote = await storageManager
+                    .collection('note')
+                    .findObject({ id: object.id })
+                expect((retrievedNote as any).createdWhen).toBeGreaterThan(
+                    beforeInsert,
+                )
+                expect((retrievedNote as any).createdWhen).toBeLessThan(
+                    afterInsert,
+                )
             })
-            await storageManager.finishInitialization()
-
-            const beforeInsert = Date.now()
-            const { object } = await storageManager
-                .collection('note')
-                .createObject({ createdWhen: '$now' })
-            const afterInsert = Date.now()
-            const snapshot = await (
-                await backend.getFirestoreCollection('note')
-            )
-                .doc(object.id)
-                .get()
-            expect(snapshot.data()).toMatchObject({
-                createdWhen: expect.any(Number),
-            })
-
-            const retrievedCreatedWhen = ((snapshot.data() as any)
-                .createdWhen as firebase.firestore.Timestamp).toMillis()
-            expect(retrievedCreatedWhen).toBeGreaterThan(beforeInsert)
-            expect(retrievedCreatedWhen).toBeLessThan(afterInsert)
-
-            const retrievedNote = await storageManager
-                .collection('note')
-                .findObject({ id: object.id })
-            expect((retrievedNote as any).createdWhen).toBeGreaterThan(
-                beforeInsert,
-            )
-            expect((retrievedNote as any).createdWhen).toBeLessThan(afterInsert)
         })
     })
 }
