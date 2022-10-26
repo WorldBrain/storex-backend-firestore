@@ -5,8 +5,8 @@ import {
     setIn,
 } from '@worldbrain/storex/lib/utils'
 import * as backend from '@worldbrain/storex/lib/types/backend'
-import { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features'
-import { CollectionDefinition } from '@worldbrain/storex'
+import type { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features'
+import type { CollectionDefinition } from '@worldbrain/storex'
 
 const firebaseUtil = require('@firebase/util')
 if (firebaseUtil.isReactNative) {
@@ -69,11 +69,11 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
         for (const step of dissection.objects) {
             const collectionDefiniton = this.registry.collections[collection]
-            const pkIndex = collectionDefiniton.pkIndex
+            const pkField = getPkField(collectionDefiniton)
             setIn(
                 object,
-                [...step.path, pkIndex],
-                batchResult.info[step.placeholder].object[pkIndex as string],
+                [...step.path, pkField],
+                batchResult.info[step.placeholder].object[pkField],
             )
         }
 
@@ -269,14 +269,12 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 const pkValue = toInsert[pkField]
                 if (
                     !pkValue &&
-                    collectionDefinition.fields[
-                        collectionDefinition.pkIndex as string
-                    ]?.type === 'auto-pk'
+                    collectionDefinition.fields[pkField]?.type === 'auto-pk'
                 ) {
                     docRef = firestoreCollection.doc()
                 } else {
                     docRef = firestoreCollection.doc(pkValue)
-                    delete toInsert[collectionDefinition.pkIndex as string]
+                    delete toInsert[pkField]
                 }
 
                 const preparedDoc = _prepareObjectForWrite(toInsert, {
@@ -289,9 +287,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                     const pk = docRef.id
                     pks[operation.placeholder] = pk
 
-                    const pkIndex = collectionDefinition.pkIndex
+                    const pkField = getPkField(collectionDefinition)
                     info[operation.placeholder] = {
-                        object: { [pkIndex as string]: pk, ...toInsert },
+                        object: { [pkField]: pk, ...toInsert },
                     }
                 }
             } else if (

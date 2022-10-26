@@ -189,6 +189,63 @@ function testFirestoreSpecifics(
                 ])
             })
         })
+
+        it('should correctly store collections with singleChildOf relationship PKs', async () => {
+            await runTest(async (backend) => {
+                const storageManager = new StorageManager({ backend })
+                storageManager.registry.registerCollections({
+                    note: {
+                        version: new Date(),
+                        fields: {
+                            noteId: { type: 'string' },
+                            label: { type: 'string' },
+                        },
+                        pkIndex: 'noteId',
+                    },
+                })
+                storageManager.registry.registerCollections({
+                    noteMetadata: {
+                        version: new Date(),
+                        fields: { review: { type: 'string' } },
+                        relationships: [{ singleChildOf: 'note' }],
+                        indices: [
+                            { field: { relationship: 'note' }, pk: true },
+                        ],
+                        pkIndex: 'note',
+                    },
+                })
+                await storageManager.finishInitialization()
+
+                const noteId = 'note-1'
+                await storageManager.collection('note').createObject({
+                    noteId,
+                    label: 'foo label',
+                })
+                await storageManager.collection('noteMetadata').createObject({
+                    review: 'foo review',
+                    note: noteId,
+                })
+                expect(
+                    await storageManager
+                        .collection('noteMetadata')
+                        .findAllObjects({}),
+                ).toEqual([
+                    {
+                        review: 'foo review',
+                        note: noteId,
+                    },
+                ])
+                const snapshot = await (
+                    await backend.getFirestoreCollection('noteMetadata')
+                )
+                    .doc(noteId)
+                    .get()
+
+                expect(snapshot.ref.id).toEqual(noteId)
+                expect(snapshot.data()).toEqual({
+                    review: 'foo review',
+                })
+            })
         })
     })
 
