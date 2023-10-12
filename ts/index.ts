@@ -371,7 +371,16 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 const groupId = options.forObject[group.key]
                 if (!groupId) {
                     throw new Error(
-                        `Tried to query grouped collection '${collection}', but did not found key '${group.key}' in query`,
+                        `Tried to query grouped collection '${collection}', but did not find grouped field '${group.key}' in query`,
+                    )
+                }
+                if (typeof groupId !== 'string') {
+                    throw new Error(
+                        `Tried to query grouped collection '${collection}', but grouped field '${
+                            group.key
+                        }' in query is not a single value: ${JSON.stringify(
+                            groupId,
+                        )}`,
                     )
                 }
                 const containerDoc = firestoreCollection.doc(groupId)
