@@ -31,25 +31,26 @@ const WHERE_OPERATORS = {
     $in: 'in',
 }
 
+// TODO: Make these deps less confusing. `firebase` + `firebaseModule` are the same thing. `firestore` is different to `firebase.firestore` - why?
+interface FirestoreStorageBackendDependencies {
+    firebase: Pick<typeof firebaseModule, 'firestore'>
+    firebaseModule?: Pick<typeof firebaseModule, 'firestore'>
+    firestore: firebaseModule.firestore.Firestore
+    rootRef?: firebaseModule.firestore.DocumentReference
+}
+
 export class FirestoreStorageBackend extends backend.StorageBackend {
     features: StorageBackendFeatureSupport = {
         executeBatch: true,
         collectionGrouping: true,
     }
-    firebase: typeof firebaseModule
-    firebaseModule: typeof firebaseModule
+    firebaseModule: Pick<typeof firebaseModule, 'firestore'>
     firestore: firebaseModule.firestore.Firestore
     rootRef?: firebaseModule.firestore.DocumentReference
 
-    constructor(options: {
-        firebase: typeof firebaseModule
-        firebaseModule?: typeof firebaseModule
-        firestore: firebaseModule.firestore.Firestore
-        rootRef?: firebaseModule.firestore.DocumentReference
-    }) {
+    constructor(options: FirestoreStorageBackendDependencies) {
         super()
 
-        this.firebase = options.firebase
         this.firebaseModule = options.firebaseModule ?? options.firebase
         this.firestore = options.firestore
         this.rootRef = options.rootRef
@@ -186,14 +187,12 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
         const pkField = getPkField(collectionDefinition)
         if (Object.keys(where).length === 1 && where[pkField]) {
-            await firestoreCollection
-                .doc(where[pkField])
-                .update(
-                    _prepareObjectForWrite(updates, {
-                        firebase: this.firebaseModule,
-                        collectionDefinition,
-                    }),
-                )
+            await firestoreCollection.doc(where[pkField]).update(
+                _prepareObjectForWrite(updates, {
+                    firestore: this.firebaseModule.firestore,
+                    collectionDefinition,
+                }),
+            )
         } else {
             const objects = await this.findObjects<any>(collection, origWhere)
 
@@ -202,7 +201,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 batch.update(
                     firestoreCollection.doc(object[pkField]),
                     _prepareObjectForWrite(updates, {
-                        firebase: this.firebaseModule,
+                        firestore: this.firebaseModule.firestore,
                         collectionDefinition,
                     }),
                 )
@@ -278,7 +277,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 }
 
                 const preparedDoc = _prepareObjectForWrite(toInsert, {
-                    firebase: this.firebaseModule,
+                    firestore: this.firebaseModule.firestore,
                     collectionDefinition,
                 })
                 batch.set(docRef, preparedDoc)
@@ -333,7 +332,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                         const updates = _prepareObjectForWrite(
                             operation.updates,
                             {
-                                firebase: this.firebaseModule,
+                                firestore: this.firebaseModule.firestore,
                                 collectionDefinition,
                                 forUpdate: true,
                             },
@@ -439,10 +438,10 @@ export function _parseQueryWhere(
     return parsed
 }
 
-export function _prepareObjectForWrite(
+function _prepareObjectForWrite(
     object: any,
     options: {
-        firebase: typeof firebaseModule
+        firestore: typeof firebaseModule.firestore
         collectionDefinition: CollectionDefinition
         forUpdate?: boolean
     },
@@ -460,7 +459,7 @@ export function _prepareObjectForWrite(
             if (object[fieldName] === '$now') {
                 object[
                     fieldName
-                ] = options.firebase.firestore.FieldValue.serverTimestamp()
+                ] = options.firestore.FieldValue.serverTimestamp()
             } else {
                 const value = object[fieldName]
                 if (typeof value === 'undefined' || value === null) {
@@ -471,9 +470,9 @@ export function _prepareObjectForWrite(
                         `Invalid timestamp provided for ${options.collectionDefinition.name}.${fieldName} in attempted Firestore write`,
                     )
                 }
-                object[
-                    fieldName
-                ] = options.firebase.firestore.Timestamp.fromMillis(value)
+                object[fieldName] = options.firestore.Timestamp.fromMillis(
+                    value,
+                )
             }
         } else if (reason === FieldProccessingReason.isGroupKey) {
             delete object[fieldName]
@@ -488,7 +487,7 @@ export function _prepareObjectForWrite(
     return object
 }
 
-export function _prepareObjectForRead(
+function _prepareObjectForRead(
     object: any,
     options: { collectionDefinition: CollectionDefinition },
 ): any {
@@ -511,7 +510,7 @@ export function _prepareObjectForRead(
     return object
 }
 
-export function _getCollectionFielsToProcess(
+function _getCollectionFielsToProcess(
     collectionDefinition: CollectionDefinition,
 ): Array<{ fieldName: string; reason: FieldProccessingReason }> {
     const groupKeys = new Set(
