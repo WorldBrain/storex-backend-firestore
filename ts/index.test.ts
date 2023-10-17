@@ -1,14 +1,9 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import expect from 'expect'
-import firebase from '@firebase/testing'
 import StorageManager from '@worldbrain/storex'
+import { documentId, Timestamp, serverTimestamp } from '@firebase/firestore'
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import {
-    createTestStorageManager,
-    testStorageBackend,
-    generateTestObject,
-} from '@worldbrain/storex/lib/index.tests'
 import { FirestoreStorageBackend, _parseQueryWhere } from '.'
 // import extractTerms from "@worldbrain/memex-stemmer";
 // import { DexieStorageBackend } from "."
@@ -47,11 +42,15 @@ describe('FirestoreStorageBackend', () => {
             projectId: `unit-test-${Date.now()}`,
             firestore: { host: 'localhost', port: 8080 },
         })
-        await testEnv.withSecurityRulesDisabled(async (firebaseApp) => {
-            const firestore = firebaseApp.firestore()
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+            const firestore = context.firestore()
             const backend = new FirestoreStorageBackend({
-                firebase: firestore.app as any,
                 firestore: firestore as any,
+                firebaseModules: {
+                    documentId,
+                    serverTimestamp,
+                    fromMillis: Timestamp.fromMillis,
+                },
             })
             await test(backend)
         })
@@ -278,7 +277,7 @@ function testFirestoreSpecifics(
                 })
 
                 const retrievedCreatedWhen = ((snapshot.data() as any)
-                    .createdWhen as firebase.firestore.Timestamp).toMillis()
+                    .createdWhen as Timestamp).toMillis()
                 expect(retrievedCreatedWhen).toBeGreaterThan(beforeInsert)
                 expect(retrievedCreatedWhen).toBeLessThan(afterInsert)
 

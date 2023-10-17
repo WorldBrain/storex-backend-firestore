@@ -1,4 +1,10 @@
-import type firebaseModule from 'firebase-admin'
+import firebaseModule from 'firebase-admin'
+import type {
+    Timestamp,
+    documentId,
+    serverTimestamp,
+} from '@firebase/firestore'
+import type firebaseCompat from 'firebase/compat/app'
 import {
     dissectCreateObjectOperation,
     convertCreateObjectDissectionToBatch,
@@ -31,12 +37,20 @@ const WHERE_OPERATORS = {
     $in: 'in',
 }
 
-// TODO: Make these deps less confusing. `firebase` + `firebaseModule` are the same thing. `firestore` is different to `firebase.firestore` - why?
 interface FirestoreStorageBackendDependencies {
-    firebase: Pick<typeof firebaseModule, 'firestore'>
-    firebaseModule?: Pick<typeof firebaseModule, 'firestore'>
     firestore: firebaseModule.firestore.Firestore
     rootRef?: firebaseModule.firestore.DocumentReference
+    firebaseModules: {
+        documentId:
+            | typeof documentId
+            | typeof firebaseCompat.firestore.FieldPath.documentId
+        fromMillis:
+            | typeof Timestamp.fromMillis
+            | typeof firebaseCompat.firestore.Timestamp.fromMillis
+        serverTimestamp:
+            | typeof serverTimestamp
+            | typeof firebaseCompat.firestore.FieldValue.serverTimestamp
+    }
 }
 
 export class FirestoreStorageBackend extends backend.StorageBackend {
@@ -44,14 +58,14 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         executeBatch: true,
         collectionGrouping: true,
     }
-    firebaseModule: Pick<typeof firebaseModule, 'firestore'>
+    firebaseModules: FirestoreStorageBackendDependencies['firebaseModules']
     firestore: firebaseModule.firestore.Firestore
     rootRef?: firebaseModule.firestore.DocumentReference
 
     constructor(options: FirestoreStorageBackendDependencies) {
         super()
 
-        this.firebaseModule = options.firebaseModule ?? options.firebase
+        this.firebaseModules = options.firebaseModules
         this.firestore = options.firestore
         this.rootRef = options.rootRef
     }
@@ -145,7 +159,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 }
                 q = q.where(
                     field === pkField
-                        ? this.firebaseModule.firestore.FieldPath.documentId()
+                        ? this.firebaseModules.documentId()
                         : field,
                     WHERE_OPERATORS[operator],
                     value,
@@ -189,8 +203,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         if (Object.keys(where).length === 1 && where[pkField]) {
             await firestoreCollection.doc(where[pkField]).update(
                 _prepareObjectForWrite(updates, {
-                    firestore: this.firebaseModule.firestore,
                     collectionDefinition,
+                    firebaseModules: this.firebaseModules,
                 }),
             )
         } else {
@@ -201,8 +215,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 batch.update(
                     firestoreCollection.doc(object[pkField]),
                     _prepareObjectForWrite(updates, {
-                        firestore: this.firebaseModule.firestore,
                         collectionDefinition,
+                        firebaseModules: this.firebaseModules,
                     }),
                 )
             }
@@ -277,8 +291,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 }
 
                 const preparedDoc = _prepareObjectForWrite(toInsert, {
-                    firestore: this.firebaseModule.firestore,
                     collectionDefinition,
+                    firebaseModules: this.firebaseModules,
                 })
                 batch.set(docRef, preparedDoc)
 
@@ -332,9 +346,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                         const updates = _prepareObjectForWrite(
                             operation.updates,
                             {
-                                firestore: this.firebaseModule.firestore,
-                                collectionDefinition,
                                 forUpdate: true,
+                                collectionDefinition,
+                                firebaseModules: this.firebaseModules,
                             },
                         )
                         batch.update(docRef, updates)
@@ -441,7 +455,7 @@ export function _parseQueryWhere(
 function _prepareObjectForWrite(
     object: any,
     options: {
-        firestore: typeof firebaseModule.firestore
+        firebaseModules: FirestoreStorageBackendDependencies['firebaseModules']
         collectionDefinition: CollectionDefinition
         forUpdate?: boolean
     },
@@ -457,9 +471,7 @@ function _prepareObjectForWrite(
     for (const { fieldName, reason } of fieldsToProcess) {
         if (reason === FieldProccessingReason.isTimestamp) {
             if (object[fieldName] === '$now') {
-                object[
-                    fieldName
-                ] = options.firestore.FieldValue.serverTimestamp()
+                object[fieldName] = options.firebaseModules.serverTimestamp()
             } else {
                 const value = object[fieldName]
                 if (typeof value === 'undefined' || value === null) {
@@ -470,9 +482,7 @@ function _prepareObjectForWrite(
                         `Invalid timestamp provided for ${options.collectionDefinition.name}.${fieldName} in attempted Firestore write`,
                     )
                 }
-                object[fieldName] = options.firestore.Timestamp.fromMillis(
-                    value,
-                )
+                object[fieldName] = options.firebaseModules.fromMillis(value)
             }
         } else if (reason === FieldProccessingReason.isGroupKey) {
             delete object[fieldName]
