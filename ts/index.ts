@@ -330,7 +330,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                             operation.operation === 'deleteObjects'
                                 ? 'delete'
                                 : 'update'
-                        } objects in batch by anything other than the primary key, which was not provided`,
+                        } ${
+                            operation.collection
+                        } objects in batch by anything other than the primary key (${pkField}), which was not provided`,
                     )
                 }
                 const pks = pkValue['$in'] ?? [pkValue]
