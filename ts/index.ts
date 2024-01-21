@@ -203,6 +203,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         if (Object.keys(where).length === 1 && where[pkField]) {
             await firestoreCollection.doc(where[pkField]).update(
                 _prepareObjectForWrite(updates, {
+                    forUpdate: true,
                     collectionDefinition,
                     firebaseModules: this.firebaseModules,
                 }),
@@ -215,6 +216,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 batch.update(
                     firestoreCollection.doc(object[pkField]),
                     _prepareObjectForWrite(updates, {
+                        forUpdate: true,
                         collectionDefinition,
                         firebaseModules: this.firebaseModules,
                     }),
@@ -490,7 +492,7 @@ function _prepareObjectForWrite(
             delete object[fieldName]
         } else if (reason === FieldProccessingReason.isOptional) {
             const value = object[fieldName]
-            if (value === null) {
+            if (value === null && !options.forUpdate) {
                 delete object[fieldName]
             }
         }
