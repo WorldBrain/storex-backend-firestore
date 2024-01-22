@@ -12,7 +12,7 @@ import {
 } from '@worldbrain/storex/lib/utils'
 import * as backend from '@worldbrain/storex/lib/types/backend'
 import type { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features'
-import type { CollectionDefinition } from '@worldbrain/storex'
+import type { CollectionDefinition, StorageRegistry } from '@worldbrain/storex'
 
 const firebaseUtil = require('@firebase/util')
 if (firebaseUtil.isReactNative) {
@@ -61,6 +61,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
     firebaseModules: FirestoreStorageBackendDependencies['firebaseModules']
     firestore: firebaseModule.firestore.Firestore
     rootRef?: firebaseModule.firestore.DocumentReference
+    registry: StorageRegistry
 
     constructor(options: FirestoreStorageBackendDependencies) {
         super()
@@ -464,7 +465,7 @@ function _prepareObjectForWrite(
         forUpdate?: boolean
     },
 ): any {
-    const fieldsToProcess = _getCollectionFielsToProcess(
+    const fieldsToProcess = _getCollectionFieldsToProcess(
         options.collectionDefinition,
     )
     if (!fieldsToProcess.length) {
@@ -505,7 +506,7 @@ function _prepareObjectForRead(
     object: any,
     options: { collectionDefinition: CollectionDefinition },
 ): any {
-    const fieldsToProcess = _getCollectionFielsToProcess(
+    const fieldsToProcess = _getCollectionFieldsToProcess(
         options.collectionDefinition,
     )
     if (!fieldsToProcess.length) {
@@ -524,7 +525,7 @@ function _prepareObjectForRead(
     return object
 }
 
-function _getCollectionFielsToProcess(
+function _getCollectionFieldsToProcess(
     collectionDefinition: CollectionDefinition,
 ): Array<{ fieldName: string; reason: FieldProccessingReason }> {
     const groupKeys = new Set(
