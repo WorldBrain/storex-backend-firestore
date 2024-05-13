@@ -186,6 +186,42 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         }
     }
 
+    async countObjects(
+        collection: string,
+        query: any,
+        options?: backend.CountOptions,
+    ): Promise<number> {
+        query = { ...query }
+
+        const collectionDefinition = this.registry.collections[collection]
+        if (!collectionDefinition) {
+            throw new Error(`Unknown collection: ${collection}`)
+        }
+
+        const firestoreCollection = await this.getFirestoreCollection(
+            collection,
+            { forObject: query, deleteGroupKeys: true },
+        )
+        const pkField = getPkField(collectionDefinition)
+
+        let q:
+            | firebaseModule.firestore.CollectionReference
+            | firebaseModule.firestore.Query = firestoreCollection
+        for (let { field, operator, value } of _parseQueryWhere(query)) {
+            if (collectionDefinition.fields[field]?.type === 'timestamp') {
+                value = new Date(value)
+            }
+            q = q.where(
+                field === pkField ? this.firebaseModules.documentId() : field,
+                WHERE_OPERATORS[operator],
+                value,
+            )
+        }
+        const results = await q.count().get()
+        const { count } = results.data()
+        return count
+    }
+
     async updateObjects(
         collection: string,
         where: any,
