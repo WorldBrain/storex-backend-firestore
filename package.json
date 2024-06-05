@@ -24,6 +24,7 @@
   ],
   "author": "Vincent den Boer",
   "dependencies": {
+    "firebase-admin": "12.1.0",
     "lodash": "^4.17.10",
     "source-map-support": "^0.4.18"
   },
@@ -40,7 +41,6 @@
     "chai": "^4.1.2",
     "expect": "^23.5.0",
     "firebase": "^9.9.2",
-    "firebase-admin": "10.3.0",
     "firebase-tools": "^8.4.3",
     "line-numbers": "^0.2.2",
     "mocha": "^4.0.1",
