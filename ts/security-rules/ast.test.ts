@@ -2,20 +2,22 @@ import expect from 'expect'
 const stripIndent = require('strip-indent')
 import { serializeRulesAST as serializeRulesAst, MatchNode } from './ast';
 
-function normalizeWithSpace(s : string) : string {
+function normalizeWithSpace(s: string): string {
     return s.replace(/^\s+$/mg, '').split('\n').map(line => line.trimRight()).join('\n')
 }
 
-export function expectSecurityRulesSerialization(root : MatchNode, expected : string) {
+export function expectSecurityRulesSerialization(root: MatchNode, expected: string) {
+    // console.log(normalizeWithSpace(stripIndent(serializeRulesAst(root))))
+    // if (1) return
     expect('\n' + normalizeWithSpace(stripIndent(serializeRulesAst(root))))
-            .toEqual(normalizeWithSpace(stripIndent(expected)))
+        .toEqual(normalizeWithSpace(stripIndent(expected)))
 }
 
 describe('Security rules AST serialization', () => {
-    function runTest(options : { root : MatchNode, expected : string }) {
+    function runTest(options: { root: MatchNode, expected: string }) {
         expectSecurityRulesSerialization(options.root, options.expected)
     }
-    
+
     it('should correctly serialize match nodes', () => {
         runTest({
             root: {
@@ -24,6 +26,7 @@ describe('Security rules AST serialization', () => {
                 content: []
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     
@@ -31,7 +34,7 @@ describe('Security rules AST serialization', () => {
             }`
         })
     })
-    
+
     it('should correctly serialize nested match nodes', () => {
         runTest({
             root: {
@@ -46,6 +49,7 @@ describe('Security rules AST serialization', () => {
                 ]
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /test {
@@ -55,7 +59,7 @@ describe('Security rules AST serialization', () => {
             }`
         })
     })
-    
+
     it('should correctly serialize multiple nested match nodes', () => {
         runTest({
             root: {
@@ -75,6 +79,7 @@ describe('Security rules AST serialization', () => {
                 ]
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /foo {
@@ -87,7 +92,7 @@ describe('Security rules AST serialization', () => {
             }`
         })
     })
-    
+
     it('should correctly serialize allow nodes', () => {
         runTest({
             root: {
@@ -102,6 +107,7 @@ describe('Security rules AST serialization', () => {
                 ]
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     allow list, get: if true;
@@ -109,7 +115,7 @@ describe('Security rules AST serialization', () => {
             }`
         })
     })
-    
+
     it('should correctly serialize function nodes', () => {
         runTest({
             root: {
@@ -124,6 +130,7 @@ describe('Security rules AST serialization', () => {
                 ]
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     function getTest() {

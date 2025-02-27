@@ -6,9 +6,9 @@ import { expectSecurityRulesSerialization } from './ast.test';
 import { SharedSyncLogStorage } from './test-cases/sync';
 
 describe('Firestore security rules generation', () => {
-    type TestOptions = { modules : { [name : string] : StorageModuleConfig }, expected : string }
+    type TestOptions = { modules: { [name: string]: StorageModuleConfig }, expected: string }
 
-    async function runTest(options : TestOptions) {
+    async function runTest(options: TestOptions) {
         const ast = await generateRulesAstFromStorageModuleConfigs(options.modules)
         expectSecurityRulesSerialization(ast, options.expected)
     }
@@ -41,6 +41,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -85,13 +86,14 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
                               request.resource.data.fieldBool is bool &&
-                              (!('fieldString' in request.resource.data.keys()) || request.resource.data.fieldString is string) &&
+                              (!('fieldString' in request.resource.data.keys()) || request.resource.data.fieldString == null || request.resource.data.fieldString is string) &&
                 
                               // Permission rules
                               true
@@ -128,6 +130,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
@@ -170,6 +173,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
@@ -213,6 +217,7 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{userId} {
@@ -225,6 +230,107 @@ describe('Firestore security rules generation', () => {
                                   request.auth.uid == userId
                                 ;
                             }
+                        }
+                    }
+                }`
+            })
+        })
+    })
+
+    describe('permissions', () => {
+        it('should generate permission rules that access the database', async () => {
+            await runTest({
+                modules: {
+                    test: {
+                        collections: {
+                            list: {
+                                version: new Date(),
+                                fields: {
+                                    content: { type: 'text' },
+                                    creator: { type: 'text' },
+                                }
+                            },
+                            entry: {
+                                version: new Date(),
+                                fields: {
+                                    content: { type: 'text' },
+                                    creator: { type: 'text' },
+                                },
+                                relationships: [
+                                    { childOf: 'list' }
+                                ]
+                            },
+                        },
+                        accessRules: {
+                            ownership: {
+                                list: {
+                                    field: 'creator',
+                                    access: ['create']
+                                },
+                                entry: {
+                                    field: 'creator',
+                                    access: ['create']
+                                },
+                            },
+                            permissions: {
+                                list: {
+                                    list: { rule: true },
+                                    read: { rule: true },
+                                },
+                                entry: {
+                                    list: { rule: true }, read: { rule: true }, create: {
+                                        prepare: [
+                                            {
+                                                placeholder: 'list', operation: 'findObject', collection: 'sharedList',
+                                                where: { id: '$value.list' },
+                                            }
+                                        ],
+                                        rule: { and: ['$ownership', { eq: ['$list.creator', '$value.creator'] }] }
+                                    }
+                                },
+                            },
+                        }
+                    },
+                },
+                expected: `
+                rules_version = '2';
+                service cloud.firestore {
+                    match /databases/{database}/documents {
+                        match /list/{list} {
+                            allow list: if
+                              // Permission rules
+                              true
+                            ;
+                            allow get: if
+                              // Permission rules
+                              true
+                            ;                            
+                            allow create: if
+                              // Type checks
+                              request.resource.data.content is string &&
+                              request.resource.data.creator is string &&
+                
+                              // Ownership rules
+                              request.auth.uid == request.resource.data.creator
+                            ;
+                        }
+                        match /entry/{entry} {
+                            allow list: if
+                              // Permission rules
+                              true
+                            ;
+                            allow get: if
+                              // Permission rules
+                              true
+                            ;                            
+                            allow create: if
+                              // Type checks
+                              request.resource.data.content is string &&
+                              request.resource.data.creator is string &&
+                
+                              // Permission rules
+                              (request.auth.uid == request.resource.data.creator && (get(/databases/$(database)/documents/sharedList/$(request.resource.data.list)).data.creator == request.resource.data.creator))
+                            ;
                         }
                     }
                 }`
@@ -266,12 +372,13 @@ describe('Firestore security rules generation', () => {
                     },
                 },
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /foo/{foo} {
                             allow create: if
                               // Type checks
-                              (!('updatedWhen' in request.resource.data.keys()) || request.resource.data.updatedWhen is timestamp) &&
+                              (!('updatedWhen' in request.resource.data.keys()) || request.resource.data.updatedWhen == null || request.resource.data.updatedWhen is timestamp) &&
                               request.resource.data.content is string &&
                 
                               // Validation rules
@@ -294,6 +401,7 @@ describe('Firestore security rules generation', () => {
             await runTest({
                 modules,
                 expected: `
+                rules_version = '2';
                 service cloud.firestore {
                     match /databases/{database}/documents {
                         match /sharedSyncLogEntry/{userId} {
@@ -420,6 +528,7 @@ describe('Firestore security rules generation', () => {
                 },
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /foo/{foo} {
@@ -471,6 +580,7 @@ describe('Firestore security rules generation', () => {
                 },
             },
             expected: `
+            rules_version = '2';
             service cloud.firestore {
                 match /databases/{database}/documents {
                     match /foo/{foo} {

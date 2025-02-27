@@ -1,12 +1,11 @@
 {
-    "version": "2.5",
     "compilerOptions": {
         "target": "es5",
         "module": "commonjs",
         "moduleResolution": "node",
-        "noImplicitAny": true,
-        "strictNullChecks": true,
+        "strict": false,
         "removeComments": true,
+        "skipLibCheck": true,
         "lib": ["es2017", "dom"],
         "noLib": false,
         "downlevelIteration": true,
