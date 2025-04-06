@@ -13,7 +13,7 @@ import type { CollectionDefinition, StorageRegistry } from '@worldbrain/storex'
 
 if (firebaseUtil?.isReactNative) {
     try {
-        firebaseUtil.isReactNative = () => true
+        ;(firebaseUtil.isReactNative as any) = () => true
     } catch (e) {}
 }
 
@@ -106,9 +106,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
         const pkIndex = collectionDefinition.pkIndex
 
-        const pairsToInclude = (collectionDefinition.groupBy || []).map(
-            (group) => [group.key, query[group.key]],
-        )
+        const pairsToInclude = (
+            collectionDefinition.groupBy || []
+        ).map((group) => [group.key, query[group.key]])
         const addKeys = (object: any, pk: string) => {
             let withPk
             const pkField = getPkField(collectionDefinition)
@@ -127,10 +127,10 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
             return withPk
         }
 
-        const firestoreCollection = await this.getFirestoreCollection(
-            collection,
-            { forObject: query, deleteGroupKeys: true },
-        )
+        const firestoreCollection = this.getFirestoreCollection(collection, {
+            forObject: query,
+            deleteGroupKeys: true,
+        })
         const pkField = getPkField(collectionDefinition)
         if (
             Object.keys(query).length === 1 &&
@@ -169,6 +169,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 q = q.limit(options.limit + (options.skip || 0))
             }
             const results = await q.get()
+            results.docs
             const docs = options.skip
                 ? results.docs.slice(options.skip)
                 : results.docs
@@ -194,10 +195,10 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
             throw new Error(`Unknown collection: ${collection}`)
         }
 
-        const firestoreCollection = await this.getFirestoreCollection(
-            collection,
-            { forObject: query, deleteGroupKeys: true },
-        )
+        const firestoreCollection = this.getFirestoreCollection(collection, {
+            forObject: query,
+            deleteGroupKeys: true,
+        })
         const pkField = getPkField(collectionDefinition)
 
         let q:
@@ -227,10 +228,10 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         const collectionDefinition = this.registry.collections[collection]
 
         const origWhere = { ...where }
-        const firestoreCollection = await this.getFirestoreCollection(
-            collection,
-            { forObject: where, deleteGroupKeys: true },
-        )
+        const firestoreCollection = this.getFirestoreCollection(collection, {
+            forObject: where,
+            deleteGroupKeys: true,
+        })
 
         const pkField = getPkField(collectionDefinition)
         if (Object.keys(where).length === 1 && where[pkField]) {
@@ -265,13 +266,10 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         options: backend.DeleteManyOptions,
     ): Promise<backend.DeleteManyResult> {
         const collectionDefinition = this.registry.collections[collection]
-        const firestoreCollection = await this.getFirestoreCollection(
-            collection,
-            {
-                forObject: query,
-                deleteGroupKeys: true,
-            },
-        )
+        const firestoreCollection = this.getFirestoreCollection(collection, {
+            forObject: query,
+            deleteGroupKeys: true,
+        })
 
         const pkField = getPkField(collectionDefinition)
         if (Object.keys(query).length !== 1 || !query[pkField]) {
@@ -295,15 +293,16 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         const pks = {}
         for (const operation of operations) {
             if (operation.operation === 'createObject') {
-                const collectionDefinition =
-                    this.registry.collections[operation.collection]
+                const collectionDefinition = this.registry.collections[
+                    operation.collection
+                ]
 
                 const toInsert = operation.args
                 for (const { path, placeholder } of operation.replace || []) {
                     toInsert[path] = pks[placeholder]
                 }
 
-                let firestoreCollection = await this.getFirestoreCollection(
+                let firestoreCollection = this.getFirestoreCollection(
                     operation.collection,
                     {
                         forObject: toInsert,
@@ -343,11 +342,12 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 operation.operation === 'deleteObjects' ||
                 operation.operation === 'updateObjects'
             ) {
-                const collectionDefinition =
-                    this.registry.collections[operation.collection]
+                const collectionDefinition = this.registry.collections[
+                    operation.collection
+                ]
                 const where = operation.where
 
-                let firestoreCollection = await this.getFirestoreCollection(
+                let firestoreCollection = this.getFirestoreCollection(
                     operation.collection,
                     {
                         forObject: where,
@@ -401,7 +401,7 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         return { info }
     }
 
-    async getFirestoreCollection(
+    getFirestoreCollection(
         collection: string,
         options?: {
             forObject?: any

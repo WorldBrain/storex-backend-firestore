@@ -141,9 +141,8 @@ function testFirestoreSpecifics(
                     listId: 'list-1',
                     label: 'foo note',
                 })
-                const snapshot = await (
-                    await backend.getFirestoreCollection('note')
-                )
+                const snapshot = await backend
+                    .getFirestoreCollection('note')
                     .doc('user-1')
                     .collection('lists')
                     .doc('list-1')
@@ -234,9 +233,8 @@ function testFirestoreSpecifics(
                         note: noteId,
                     },
                 ])
-                const snapshot = await (
-                    await backend.getFirestoreCollection('noteMetadata')
-                )
+                const snapshot = await backend
+                    .getFirestoreCollection('noteMetadata')
                     .doc(noteId)
                     .get()
 
@@ -267,9 +265,8 @@ function testFirestoreSpecifics(
                     .collection('note')
                     .createObject({ createdWhen: '$now' })
                 const afterInsert = Date.now()
-                const snapshot = await (
-                    await backend.getFirestoreCollection('note')
-                )
+                const snapshot = await backend
+                    .getFirestoreCollection('note')
                     .doc(object.id)
                     .get()
                 expect(snapshot.data()).toMatchObject({
