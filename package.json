@@ -37,7 +37,7 @@
     "@types/mocha": "^2.2.44",
     "@types/node": "^10.12.11",
     "@worldbrain/storex": "^0.4.1",
-    "@worldbrain/storex-pattern-modules": "^0.4.0",
+    "@worldbrain/storex-pattern-modules/ts": "^0.4.0",
     "chai": "^4.1.2",
     "expect": "^23.5.0",
     "firebase": "10.11.0",
@@ -51,8 +51,8 @@
   },
   "peerDependencies": {
     "@worldbrain/storex": "^0.4.1",
-    "@worldbrain/storex-pattern-modules": "^0.4.0",
-    "firebase": "10.11.0",
-    "firebase-admin": "13.1.0"
+    "@worldbrain/storex-pattern-modules/ts": "^0.4.0",
+    "firebase": "^9.12.1",
+    "firebase-admin": "10.3.0"
   }
 }

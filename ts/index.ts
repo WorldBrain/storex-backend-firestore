@@ -6,16 +6,13 @@ import {
     dissectCreateObjectOperation,
     convertCreateObjectDissectionToBatch,
     setIn,
-} from '@worldbrain/storex/lib/utils'
-import * as backend from '@worldbrain/storex/lib/types/backend'
-import type { StorageBackendFeatureSupport } from '@worldbrain/storex/lib/types/backend-features'
-import type { CollectionDefinition, StorageRegistry } from '@worldbrain/storex'
-
-if (firebaseUtil?.isReactNative) {
-    try {
-        ;(firebaseUtil.isReactNative as any) = () => true
-    } catch (e) {}
-}
+} from '@worldbrain/storex/ts/utils'
+import * as backend from '@worldbrain/storex/ts/types/backend'
+import type { StorageBackendFeatureSupport } from '@worldbrain/storex/ts/types/backend-features'
+import type {
+    CollectionDefinition,
+    StorageRegistry,
+} from '@worldbrain/storex/ts'
 
 enum FieldProccessingReason {
     isTimestamp = 1,
@@ -106,9 +103,9 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
 
         const pkIndex = collectionDefinition.pkIndex
 
-        const pairsToInclude = (
-            collectionDefinition.groupBy || []
-        ).map((group) => [group.key, query[group.key]])
+        const pairsToInclude = (collectionDefinition.groupBy || []).map(
+            (group) => [group.key, query[group.key]],
+        )
         const addKeys = (object: any, pk: string) => {
             let withPk
             const pkField = getPkField(collectionDefinition)
@@ -293,9 +290,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
         const pks = {}
         for (const operation of operations) {
             if (operation.operation === 'createObject') {
-                const collectionDefinition = this.registry.collections[
-                    operation.collection
-                ]
+                const collectionDefinition =
+                    this.registry.collections[operation.collection]
 
                 const toInsert = operation.args
                 for (const { path, placeholder } of operation.replace || []) {
@@ -342,9 +338,8 @@ export class FirestoreStorageBackend extends backend.StorageBackend {
                 operation.operation === 'deleteObjects' ||
                 operation.operation === 'updateObjects'
             ) {
-                const collectionDefinition = this.registry.collections[
-                    operation.collection
-                ]
+                const collectionDefinition =
+                    this.registry.collections[operation.collection]
                 const where = operation.where
 
                 let firestoreCollection = this.getFirestoreCollection(

@@ -1,16 +1,28 @@
-import { CollectionDefinitionMap } from '@worldbrain/storex';
-import { StorageModule, StorageModuleConfig, StorageModuleConstructorArgs, StorageModuleDebugConfig } from '@worldbrain/storex-pattern-modules'
-import { StorageOperationDefinitions, AccessRules } from '@worldbrain/storex-pattern-modules/lib/types';
+import { CollectionDefinitionMap } from '@worldbrain/storex/ts'
+import {
+    StorageModule,
+    StorageModuleConfig,
+    StorageModuleConstructorArgs,
+    StorageModuleDebugConfig,
+} from '@worldbrain/storex-pattern-modules/ts'
+import {
+    StorageOperationDefinitions,
+    AccessRules,
+} from '@worldbrain/storex-pattern-modules/ts/types'
 
 export class SharedSyncLogStorage extends StorageModule {
-    private autoPkType : 'string' | 'int'
+    private autoPkType: 'string' | 'int'
 
-    constructor(options : StorageModuleConstructorArgs & { autoPkType : 'string' | 'int' }) {
+    constructor(
+        options: StorageModuleConstructorArgs & {
+            autoPkType: 'string' | 'int'
+        },
+    ) {
         super(options)
         this.autoPkType = options.autoPkType
     }
 
-    getConfig : () => StorageModuleConfig = () =>
+    getConfig: () => StorageModuleConfig = () =>
         createSharedSyncLogConfig({
             autoPkType: this.autoPkType,
             collections: {
@@ -22,8 +34,8 @@ export class SharedSyncLogStorage extends StorageModule {
                         retrieverDeviceId: { type: this.autoPkType },
                         createdOn: { type: 'timestamp' },
                     },
-                    groupBy: [{ key: 'userId', subcollectionName: 'entries' }]
-                }
+                    groupBy: [{ key: 'userId', subcollectionName: 'entries' }],
+                },
             },
             accessRules: {
                 ownership: {
@@ -44,20 +56,20 @@ export class SharedSyncLogStorage extends StorageModule {
                     sharedSyncLogDeviceInfo: [
                         {
                             field: 'sharedUntil',
-                            rule: { eq: ['$value', '$context.now'] }
-                        }
-                    ]
+                            rule: { eq: ['$value', '$context.now'] },
+                        },
+                    ],
                 },
-            }
+            },
         })
 }
 
-export function createSharedSyncLogConfig(options : {
-    autoPkType : 'int' | 'string',
-    collections? : CollectionDefinitionMap,
-    operations? : StorageOperationDefinitions,
-    accessRules? : AccessRules,
-}) : StorageModuleConfig {
+export function createSharedSyncLogConfig(options: {
+    autoPkType: 'int' | 'string'
+    collections?: CollectionDefinitionMap
+    operations?: StorageOperationDefinitions
+    accessRules?: AccessRules
+}): StorageModuleConfig {
     return {
         operations: options.operations,
         collections: {
@@ -80,23 +92,26 @@ export function createSharedSyncLogConfig(options : {
                 },
                 groupBy: [{ key: 'userId', subcollectionName: 'devices' }],
             },
-            ...(options.collections || {})
+            ...(options.collections || {}),
         },
         methods: {
             createDeviceId: {
                 type: 'mutation',
                 args: {
                     userId: options.autoPkType,
-                    sharedUntil: 'float'
+                    sharedUntil: 'float',
                 },
-                returns: options.autoPkType
+                returns: options.autoPkType,
             },
             writeEntries: {
                 type: 'mutation',
                 args: {
-                    entries: { type: { array: { collection: 'sharedSyncLogEntry' } }, positional: true },
+                    entries: {
+                        type: { array: { collection: 'sharedSyncLogEntry' } },
+                        positional: true,
+                    },
                 },
-                returns: 'void'
+                returns: 'void',
             },
             getUnsyncedEntries: {
                 type: 'query',
@@ -108,11 +123,21 @@ export function createSharedSyncLogConfig(options : {
             markAsSeen: {
                 type: 'mutation',
                 args: {
-                    entries: { type: { array: { object: { createdOn: 'float', deviceId: options.autoPkType }, singular: 'entry' } } },
+                    entries: {
+                        type: {
+                            array: {
+                                object: {
+                                    createdOn: 'float',
+                                    deviceId: options.autoPkType,
+                                },
+                                singular: 'entry',
+                            },
+                        },
+                    },
                     deviceId: { type: options.autoPkType },
                 },
                 returns: 'void',
-            }
+            },
         },
         accessRules: options.accessRules,
     }

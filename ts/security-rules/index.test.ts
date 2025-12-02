@@ -1,15 +1,26 @@
 import mapValues from 'lodash/mapValues'
-import { StorageModuleConfig, registerModuleMapCollections } from '@worldbrain/storex-pattern-modules'
-import { StorageRegistry } from '@worldbrain/storex';
-import { generateRulesAstFromStorageModules, generateRulesAstFromStorageModuleConfigs } from '.';
-import { expectSecurityRulesSerialization } from './ast.test';
-import { SharedSyncLogStorage } from './test-cases/sync';
+import {
+    StorageModuleConfig,
+    registerModuleMapCollections,
+} from '@worldbrain/storex-pattern-modules/ts'
+import { StorageRegistry } from '@worldbrain/storex/ts'
+import {
+    generateRulesAstFromStorageModules,
+    generateRulesAstFromStorageModuleConfigs,
+} from '.'
+import { expectSecurityRulesSerialization } from './ast.test'
+import { SharedSyncLogStorage } from './test-cases/sync'
 
 describe('Firestore security rules generation', () => {
-    type TestOptions = { modules: { [name: string]: StorageModuleConfig }, expected: string }
+    type TestOptions = {
+        modules: { [name: string]: StorageModuleConfig }
+        expected: string
+    }
 
     async function runTest(options: TestOptions) {
-        const ast = await generateRulesAstFromStorageModuleConfigs(options.modules)
+        const ast = await generateRulesAstFromStorageModuleConfigs(
+            options.modules,
+        )
         expectSecurityRulesSerialization(ast, options.expected)
     }
 
@@ -28,16 +39,16 @@ describe('Firestore security rules generation', () => {
                                     fieldInt: { type: 'int' },
                                     fieldFloat: { type: 'float' },
                                     fieldTimestamp: { type: 'timestamp' },
-                                }
+                                },
                             },
                         },
                         accessRules: {
                             permissions: {
                                 foo: {
                                     create: { rule: true },
-                                }
-                            }
-                        }
+                                },
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -59,7 +70,7 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
 
@@ -72,17 +83,20 @@ describe('Firestore security rules generation', () => {
                                 version: new Date(),
                                 fields: {
                                     fieldBool: { type: 'boolean' },
-                                    fieldString: { type: 'string', optional: true },
-                                }
+                                    fieldString: {
+                                        type: 'string',
+                                        optional: true,
+                                    },
+                                },
                             },
                         },
                         accessRules: {
                             permissions: {
                                 foo: {
                                     create: { rule: true },
-                                }
-                            }
-                        }
+                                },
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -100,7 +114,7 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
     })
@@ -116,17 +130,17 @@ describe('Firestore security rules generation', () => {
                                 fields: {
                                     userId: { type: 'string' },
                                     fieldBool: { type: 'boolean' },
-                                }
+                                },
                             },
                         },
                         accessRules: {
                             ownership: {
                                 foo: {
                                     field: 'userId',
-                                    access: ['create']
-                                }
-                            }
-                        }
+                                    access: ['create'],
+                                },
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -144,7 +158,7 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
 
@@ -166,10 +180,10 @@ describe('Firestore security rules generation', () => {
                             ownership: {
                                 foo: {
                                     field: 'userId',
-                                    access: ['create']
-                                }
-                            }
-                        }
+                                    access: ['create'],
+                                },
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -186,7 +200,7 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
 
@@ -202,7 +216,12 @@ describe('Firestore security rules generation', () => {
                                     listId: { type: 'string' },
                                     fieldBool: { type: 'boolean' },
                                 },
-                                groupBy: [{ key: 'userId', subcollectionName: 'lists' }],
+                                groupBy: [
+                                    {
+                                        key: 'userId',
+                                        subcollectionName: 'lists',
+                                    },
+                                ],
                                 pkIndex: 'listId',
                             },
                         },
@@ -210,10 +229,10 @@ describe('Firestore security rules generation', () => {
                             ownership: {
                                 foo: {
                                     field: 'userId',
-                                    access: ['create']
-                                }
-                            }
-                        }
+                                    access: ['create'],
+                                },
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -232,7 +251,7 @@ describe('Firestore security rules generation', () => {
                             }
                         }
                     }
-                }`
+                }`,
             })
         })
     })
@@ -248,7 +267,7 @@ describe('Firestore security rules generation', () => {
                                 fields: {
                                     content: { type: 'text' },
                                     creator: { type: 'text' },
-                                }
+                                },
                             },
                             entry: {
                                 version: new Date(),
@@ -256,20 +275,18 @@ describe('Firestore security rules generation', () => {
                                     content: { type: 'text' },
                                     creator: { type: 'text' },
                                 },
-                                relationships: [
-                                    { childOf: 'list' }
-                                ]
+                                relationships: [{ childOf: 'list' }],
                             },
                         },
                         accessRules: {
                             ownership: {
                                 list: {
                                     field: 'creator',
-                                    access: ['create']
+                                    access: ['create'],
                                 },
                                 entry: {
                                     field: 'creator',
-                                    access: ['create']
+                                    access: ['create'],
                                 },
                             },
                             permissions: {
@@ -278,18 +295,32 @@ describe('Firestore security rules generation', () => {
                                     read: { rule: true },
                                 },
                                 entry: {
-                                    list: { rule: true }, read: { rule: true }, create: {
+                                    list: { rule: true },
+                                    read: { rule: true },
+                                    create: {
                                         prepare: [
                                             {
-                                                placeholder: 'list', operation: 'findObject', collection: 'sharedList',
+                                                placeholder: 'list',
+                                                operation: 'findObject',
+                                                collection: 'sharedList',
                                                 where: { id: '$value.list' },
-                                            }
+                                            },
                                         ],
-                                        rule: { and: ['$ownership', { eq: ['$list.creator', '$value.creator'] }] }
-                                    }
+                                        rule: {
+                                            and: [
+                                                '$ownership',
+                                                {
+                                                    eq: [
+                                                        '$list.creator',
+                                                        '$value.creator',
+                                                    ],
+                                                },
+                                            ],
+                                        },
+                                    },
                                 },
                             },
-                        }
+                        },
                     },
                 },
                 expected: `
@@ -333,7 +364,7 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
     })
@@ -347,9 +378,12 @@ describe('Firestore security rules generation', () => {
                             foo: {
                                 version: new Date(),
                                 fields: {
-                                    updatedWhen: { type: 'timestamp', optional: true },
+                                    updatedWhen: {
+                                        type: 'timestamp',
+                                        optional: true,
+                                    },
                                     content: { type: 'text' },
-                                }
+                                },
                             },
                         },
                         accessRules: {
@@ -358,17 +392,19 @@ describe('Firestore security rules generation', () => {
                                     create: {
                                         rule: true,
                                     },
-                                }
+                                },
                             },
                             validation: {
                                 foo: [
                                     {
                                         field: 'updatedWhen',
-                                        rule: { eq: ['$value', '$context.now'] }
-                                    }
-                                ]
-                            }
-                        }
+                                        rule: {
+                                            eq: ['$value', '$context.now'],
+                                        },
+                                    },
+                                ],
+                            },
+                        },
                     },
                 },
                 expected: `
@@ -389,13 +425,18 @@ describe('Firestore security rules generation', () => {
                             ;
                         }
                     }
-                }`
+                }`,
             })
         })
     })
 
     describe('test cases', () => {
-        const modules = { sharedSyncLog: new SharedSyncLogStorage({ storageManager: null as any, autoPkType: 'string' }).getConfig() }
+        const modules = {
+            sharedSyncLog: new SharedSyncLogStorage({
+                storageManager: null as any,
+                autoPkType: 'string',
+            }).getConfig(),
+        }
 
         it('should correctly handle the sync test case', async () => {
             await runTest({
@@ -492,7 +533,7 @@ describe('Firestore security rules generation', () => {
                             }
                         }
                     }
-                }`
+                }`,
             })
         })
     })
@@ -507,24 +548,24 @@ describe('Firestore security rules generation', () => {
                             fields: {
                                 userId: { type: 'string' },
                                 fieldBool: { type: 'boolean' },
-                            }
+                            },
                         },
                         bar: {
                             version: new Date(),
                             fields: {
                                 userId: { type: 'string' },
                                 fieldBool: { type: 'boolean' },
-                            }
+                            },
                         },
                     },
                     accessRules: {
                         ownership: {
                             foo: {
                                 field: 'userId',
-                                access: ['create']
-                            }
-                        }
-                    }
+                                access: ['create'],
+                            },
+                        },
+                    },
                 },
             },
             expected: `
@@ -542,7 +583,7 @@ describe('Firestore security rules generation', () => {
                         ;
                     }
                 }
-            }`
+            }`,
         })
     })
 
@@ -556,7 +597,7 @@ describe('Firestore security rules generation', () => {
                             fields: {
                                 userId: { type: 'string' },
                                 fieldBool: { type: 'boolean' },
-                            }
+                            },
                         },
                         bar: {
                             version: new Date(),
@@ -565,18 +606,18 @@ describe('Firestore security rules generation', () => {
                                 fieldBool: { type: 'boolean' },
                             },
                             groupBy: [
-                                { key: 'userId', subcollectionName: 'bars' }
-                            ]
+                                { key: 'userId', subcollectionName: 'bars' },
+                            ],
                         },
                     },
                     accessRules: {
                         ownership: {
                             foo: {
                                 field: 'userId',
-                                access: ['create']
-                            }
-                        }
-                    }
+                                access: ['create'],
+                            },
+                        },
+                    },
                 },
             },
             expected: `
@@ -594,7 +635,7 @@ describe('Firestore security rules generation', () => {
                         ;
                     }
                 }
-            }`
+            }`,
         })
     })
 })

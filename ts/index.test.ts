@@ -1,11 +1,11 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import expect from 'expect'
-import StorageManager from '@worldbrain/storex'
+import StorageManager from '@worldbrain/storex/ts'
 import { documentId, Timestamp, serverTimestamp } from '@firebase/firestore'
 import { initializeTestEnvironment } from '@firebase/rules-unit-testing'
 import { FirestoreStorageBackend, _parseQueryWhere } from '.'
-// import extractTerms from "@worldbrain/memex-stemmer";
+// import extractTerms from "@worldbrain/memex-stemmer/ts";
 // import { DexieStorageBackend } from "."
 // import inMemory from './in-memory'
 
@@ -273,8 +273,9 @@ function testFirestoreSpecifics(
                     createdWhen: expect.any(Number),
                 })
 
-                const retrievedCreatedWhen = ((snapshot.data() as any)
-                    .createdWhen as Timestamp).toMillis()
+                const retrievedCreatedWhen = (
+                    (snapshot.data() as any).createdWhen as Timestamp
+                ).toMillis()
                 expect(retrievedCreatedWhen).toBeGreaterThan(beforeInsert)
                 expect(retrievedCreatedWhen).toBeLessThan(afterInsert)
 
